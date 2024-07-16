@@ -42,7 +42,6 @@
 /datum/sprite_accessory/hair/longest
 	name = "Very Long Hair"
 	icon_state = "hair_longest"
-	selectable = 0
 
 /datum/sprite_accessory/hair/longfringe
 	name = "Long Fringe"
@@ -109,8 +108,7 @@
 
 /datum/sprite_accessory/hair/bedhead
 	name = "Bedhead"
-	icon_state = "hair_bedhead"
-	selectable = 0
+	icon_state = "hair_bedhead"+
 
 /datum/sprite_accessory/hair/bedhead2
 	name = "Bedhead 2"
@@ -185,7 +183,6 @@
 /datum/sprite_accessory/hair/dreadlocks
 	name = "Dreadlocks"
 	icon_state = "hair_dreads"
-	selectable = 0
 
 /datum/sprite_accessory/hair/curls
 	name = "Curls"
@@ -290,7 +287,6 @@
 	name = "Medium Braid"
 	icon_state = "hair_shortbraid"
 	gender = FEMALE
-	selectable = 0
 
 /datum/sprite_accessory/hair/braid2
 	name = "Long Braid"
@@ -312,7 +308,6 @@
 	name = "Updo"
 	icon_state = "hair_updo"
 	gender = FEMALE
-	selectable = 0
 
 /datum/sprite_accessory/hair/skinhead
 	name = "Skinhead"
@@ -344,7 +339,6 @@
 	name = "Poofy"
 	icon_state = "hair_poofy"
 	gender = FEMALE
-	
 
 /datum/sprite_accessory/hair/crono
 	name = "Chrono"
@@ -645,7 +639,7 @@
 	name = "Sideswept"
 	icon_state = "hair_sideswept"
 
-/datum/sprite_accessory/hair/mohawkshaved
+/datum/sprite_accessory/hair/familyaved
 	name = "Shaved Mohawk"
 	icon_state = "hair_mohawkshaved"
 
