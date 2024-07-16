@@ -344,7 +344,7 @@
 	name = "Poofy"
 	icon_state = "hair_poofy"
 	gender = FEMALE
-	selectable = 0
+	
 
 /datum/sprite_accessory/hair/crono
 	name = "Chrono"
