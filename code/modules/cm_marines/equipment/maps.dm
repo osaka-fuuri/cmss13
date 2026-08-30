@@ -1,6 +1,12 @@
+GLOBAL_LIST_INIT(mapless_maps, list(MAP_RUNTIME, MAP_CHINOOK, MAIN_SHIP_DEFAULT_NAME, MAP_ROSTOCK, MAP_HUNTERSHIP))
+
 /obj/item/map
 	name = "map"
 	icon = 'icons/obj/items/marine-items.dmi'
+	item_icons = list(
+		WEAR_L_HAND = 'icons/mob/humans/onmob/inhands/equipment/paperwork_lefthand.dmi',
+		WEAR_R_HAND = 'icons/mob/humans/onmob/inhands/equipment/paperwork_righthand.dmi'
+	)
 	icon_state = "map"
 	item_state = "map"
 	throw_speed = SPEED_FAST
@@ -9,11 +15,10 @@
 	// color = ... (Colors can be names - "red, green, grey, cyan" or a HEX color code "#FF0000")
 	var/dat // Page content
 	var/html_link = ""
-	var/window_size = "1280x720"
 
 /obj/item/map/attack_self(mob/user) //Open the map
 	..()
-	user.visible_message(SPAN_NOTICE("[user] opens the [src.name]. "))
+	user.visible_message(SPAN_NOTICE("[user] opens the [src.name]."))
 	initialize_map()
 
 /obj/item/map/attack()
@@ -54,7 +59,7 @@
 
 				</html>
 			"}
-	show_browser(usr, dat, name, "papermap", "size=[window_size]")
+	show_browser(usr, dat, name, "papermap", width = 1280, height = 720)
 
 /obj/item/map/lazarus_landing_map
 	name = "\improper Lazarus Landing Map"
@@ -81,13 +86,13 @@
 
 /obj/item/map/big_red_map
 	name = "\improper Solaris Ridge Map"
-	desc = "A censored blueprint of the Solaris Ridge facility"
+	desc = "A censored blueprint of the Solaris Ridge facility."
 	html_link = "images/9/9e/Solaris_Ridge.png"
 	color = "#e88a10"
 
 /obj/item/map/FOP_map
 	name = "\improper Fiorina Orbital Penitentiary Map"
-	desc = "A labelled interior scan of Fiorina Orbital Penitentiary"
+	desc = "A labelled interior scan of Fiorina Orbital Penitentiary."
 	html_link = "images/4/4c/Map_Prison.png"
 	color = "#e88a10"
 
@@ -105,19 +110,19 @@
 
 /obj/item/map/sorokyne_map
 	name = "\improper Sorokyne Strata map"
-	desc = "A map of the Weyland-Yutani colony Sorokyne Outpost, commonly known as Sorokyne Strata."
+	desc = "A map of the UPP colony Sorokyne Outpost, commonly known as Sorokyne Strata."
 	html_link = "images/2/21/Sorokyne_Wiki_Map.jpg" //The fact that this is just a wiki-link makes me sad and amused.
 	color = "cyan"
 
 /obj/item/map/corsat
 	name = "\improper CORSAT map"
-	desc = "A blueprint of CORSAT station"
+	desc = "A blueprint of CORSAT station."
 	html_link = "images/8/8e/CORSAT_Satellite.png"
 	color = "red"
 
 /obj/item/map/kutjevo_map
 	name = "\improper Kutjevo Refinery map"
-	desc = "An orbital scan of Kutjevo Refinery"
+	desc = "An orbital scan of Kutjevo Refinery."
 	html_link = "images/0/0d/Kutjevo_a1.jpg"
 	color = "red"
 
@@ -127,11 +132,34 @@
 	html_link = "images/b/bb/C_claim.png"
 	color = "cyan"
 
+/obj/item/map/lv759_map
+	name = "\improper LV-759 Map"
+	desc = "An overview of LV-759 schematics."
+	html_link = "images/6/60/LV759_Hybrisa_Prospera.png" //needs proper image still.
+	color = "#005eab"
+
 /obj/item/map/new_varadero
 	name = "\improper New Varadero map"
-	desc = "A labeled blueprint of the UA outpost New Varadero"
+	desc = "A labeled blueprint of the UA outpost New Varadero."
 	html_link = "images/9/94/New_Varadero.png"
 	color = "red"
+
+/obj/item/map/tyrargo_rift
+	name = "\improper Tyrargo Rift map"
+	desc = "A labeled blueprint of the UA city Tyrargo Rift."
+	html_link = "images/7/79/Tyrargo_Rift.png"
+
+/obj/item/map/white_antre_map
+	name = "\improper White Antre Research Facility map"
+	desc = "An overview of the White Antre facility schematics."
+	html_link = "images/d/da/White_Antre_Research_Facility.png"
+	color = "cyan"
+
+/obj/item/map/galaxy
+	name = "\improper Galaxy map"
+	desc = "A diagrammatic map of the milky way, laid out by sector."
+	html_link = "images/9/9e/Galaxy_Map.png"
+	color = "#005eab"
 
 GLOBAL_LIST_INIT_TYPED(map_type_list, /obj/item/map, setup_all_maps())
 
@@ -149,7 +177,10 @@ GLOBAL_LIST_INIT_TYPED(map_type_list, /obj/item/map, setup_all_maps())
 		MAP_CORSAT = new /obj/item/map/corsat(),
 		MAP_KUTJEVO = new /obj/item/map/kutjevo_map(),
 		MAP_LV522_CHANCES_CLAIM = new /obj/item/map/lv522_map(),
-		MAP_NEW_VARADERO = new /obj/item/map/new_varadero()
+		MAP_LV759_HYBRISA_PROSPERA = new /obj/item/map/lv759_map(),
+		MAP_NEW_VARADERO = new /obj/item/map/new_varadero(),
+		MAP_TYRARGO_RIFT = new /obj/item/map/tyrargo_rift(),
+		MAP_WHITE_ANTRE_RESEARCH_FACILITY = new /obj/item/map/white_antre_map()
 	)
 
 //used by marine equipment machines to spawn the correct map.
@@ -160,7 +191,7 @@ GLOBAL_LIST_INIT_TYPED(map_type_list, /obj/item/map, setup_all_maps())
 
 	var/map_name = SSmapping.configs[GROUND_MAP].map_name
 	var/obj/item/map/map = GLOB.map_type_list[map_name]
-	if (!map && (map_name == MAP_RUNTIME || map_name == MAP_CHINOOK || map_name == MAIN_SHIP_DEFAULT_NAME))
+	if (!map && (map_name in GLOB.mapless_maps))
 		return // "Maps" we don't have maps for so we don't need to throw a runtime for (namely in unit_testing)
 	name = map.name
 	desc = map.desc

@@ -50,14 +50,24 @@ map kutjevo
 endmap
 
 map sorokyne_strata
-	minplayers 130
+	minplayers 110
 endmap
 
 map lv522_chances_claim
+endmap
+
+map lv759_hybrisa_prospera
 	minplayers 130
 endmap
 
 map new_varadero
+endmap
+
+map tyrargo_rift
+	minplayers 100
+endmap
+
+map white_antre_research_facility
 endmap
 
 map whiskey_outpost_v2

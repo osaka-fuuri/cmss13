@@ -36,7 +36,7 @@
 	set name = "View Playtimes"
 	set desc = "View your playtimes."
 	if(!SSentity_manager.ready)
-		to_chat(src, "DB is still starting up, please wait")
+		to_chat(src, "DB is still starting up, please wait.")
 		return
 	if(client && client.player_entity)
 		client.player_data.tgui_interact(src)
@@ -111,13 +111,13 @@
 		is_admin = 1
 
 	if (!CONFIG_GET(flag/respawn) && !is_admin)
-		to_chat(usr, SPAN_NOTICE(" Respawn is disabled."))
+		to_chat(usr, SPAN_NOTICE("Respawn is disabled."))
 		return
 	if (stat != 2)
-		to_chat(usr, SPAN_NOTICE(" <B>You must be dead to use this!</B>"))
+		to_chat(usr, SPAN_NOTICE("<B>You must be dead to use this!</B>"))
 		return
 	if (SSticker.mode && (SSticker.mode.name == "meteor" || SSticker.mode.name == "epidemic")) //BS12 EDIT
-		to_chat(usr, SPAN_NOTICE(" Respawn is disabled for this roundtype."))
+		to_chat(usr, SPAN_NOTICE("Respawn is disabled for this roundtype."))
 		return
 	else
 		var/deathtime = world.time - src.timeofdeath
@@ -137,12 +137,13 @@
 
 	log_game("[usr.name]/[usr.key] used abandon mob.")
 
-	to_chat(usr, SPAN_NOTICE(" <B>Make sure to play a different character, and please roleplay correctly!</B>"))
+	to_chat(usr, SPAN_NOTICE("<B>Make sure to play a different character, and please roleplay correctly!</B>"))
 
 	if(!client)
 		log_game("[usr.key] AM failed due to disconnect.")
 		return
 	client.screen.Cut()
+	client.render_plates_shown = alist()
 	if(!client)
 		log_game("[usr.key] AM failed due to disconnect.")
 		return
@@ -154,7 +155,8 @@
 		return
 
 	M.key = key
-	if(M.client) M.client.change_view(GLOB.world_view_size)
+	if(M.client)
+		M.client.change_view(GLOB.world_view_size)
 // M.Login() //wat
 	return
 
@@ -244,3 +246,44 @@
 				//so we must undo it here so the victim can move right away
 				M.client.next_movement = world.time
 			M.update_transform(TRUE)
+
+/mob/living/verb/look_up()
+	set name = "Look Up"
+	set category = "IC"
+
+	if(observed_atom)
+		QDEL_NULL(observed_atom)
+		return
+
+	if(!client)
+		return
+
+	if(istype(client.get_eye(), /mob/hologram))
+		var/mob/hologram/eye = client.get_eye()
+		eye.change_level()
+		return
+
+	if(client.view != world.view)
+		to_chat(src, SPAN_WARNING("You cannot look up while zoomed!"))
+		return
+
+	if(HAS_TRAIT(src, TRAIT_ABILITY_BURROWED))
+		to_chat(src, SPAN_WARNING("We cannot look up here, we are burrowed!"))
+		return
+
+	if(!isturf(loc))
+		to_chat(src, SPAN_WARNING("You cannot look up here."))
+		return
+
+	var/turf/above = SSmapping.get_turf_above(loc)
+	if(!isturf(above))
+		to_chat(src, SPAN_WARNING("You cannot look up here."))
+		return
+
+	if(!istransparentturf(above))
+		to_chat(src, SPAN_WARNING("You cannot look up here."))
+		return
+
+	var/mob/hologram/look_up/observed_hologram = new(above, src)
+
+	observed_atom = observed_hologram

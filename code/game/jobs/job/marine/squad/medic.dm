@@ -8,9 +8,9 @@
 	entry_message_body = "<a href='"+WIKI_PLACEHOLDER+"'>You tend the wounds of your squad mates</a> and make sure they are healthy and active. You may not be a fully-fledged doctor, but you stand between life and death when it matters."
 
 /datum/job/marine/medic/set_spawn_positions(count)
-	for(var/datum/squad/sq in GLOB.RoleAuthority.squads)
-		if(sq)
-			sq.max_medics = medic_slot_formula(count)
+	for(var/datum/squad/target_squad in GLOB.RoleAuthority.squads)
+		if(target_squad)
+			target_squad.roles_cap[title] = medic_slot_formula(count)
 
 /datum/job/marine/medic/get_total_positions(latejoin=0)
 	var/slots = medic_slot_formula(get_total_marines())
@@ -21,11 +21,20 @@
 		total_positions_so_far = slots
 
 	if(latejoin)
-		for(var/datum/squad/sq in GLOB.RoleAuthority.squads)
-			if(sq)
-				sq.max_medics = slots
+		for(var/datum/squad/target_squad in GLOB.RoleAuthority.squads)
+			if(target_squad)
+				target_squad.roles_cap[title] = slots
 
 	return (slots*4)
+
+/datum/job/marine/medic/generate_entry_conditions(mob/living/carbon/human/current_human)
+	. = ..()
+	GLOB.marine_medics += current_human
+	RegisterSignal(current_human, COMSIG_PARENT_QDELETING, PROC_REF(cleanup_medic_role))
+
+/datum/job/marine/medic/proc/cleanup_medic_role(mob/current_human)
+	SIGNAL_HANDLER
+	GLOB.marine_medics -= current_human
 
 /datum/job/marine/medic/whiskey
 	title = JOB_WO_SQUAD_MEDIC

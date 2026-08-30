@@ -8,7 +8,7 @@
 
 //Used for logging people entering cryosleep and important items they are carrying.
 GLOBAL_LIST_EMPTY(frozen_crew)
-GLOBAL_LIST_INIT(frozen_items, list(SQUAD_MARINE_1 = list(), SQUAD_MARINE_2 = list(), SQUAD_MARINE_3 = list(), SQUAD_MARINE_4 = list(), "MP" = list(), "REQ" = list(), "Eng" = list(), "Med" = list(), "Yautja" = list()))
+GLOBAL_LIST_INIT(frozen_items, list(SQUAD_MARINE_1 = list(), SQUAD_MARINE_2 = list(), SQUAD_MARINE_3 = list(), SQUAD_MARINE_4 = list(), "MP" = list(), "REQ" = list(), "Eng" = list(), "Med" = list(), "Yautja" = list(), "Responders" = list()))
 
 //Main cryopod console.
 
@@ -18,7 +18,7 @@ GLOBAL_LIST_INIT(frozen_items, list(SQUAD_MARINE_1 = list(), SQUAD_MARINE_2 = li
 	icon = 'icons/obj/structures/machinery/computer.dmi'
 	icon_state = "cellconsole"
 	circuit = /obj/item/circuitboard/computer/cryopodcontrol
-	exproof = TRUE
+	explo_proof = TRUE
 	unslashable = TRUE
 	unacidable = TRUE
 	var/cryotype = "REQ"
@@ -48,7 +48,12 @@ GLOBAL_LIST_INIT(frozen_items, list(SQUAD_MARINE_1 = list(), SQUAD_MARINE_2 = li
 
 /obj/structure/machinery/computer/cryopod/yautja
 	cryotype = "Yautja"
+	icon = 'icons/obj/structures/machinery/yautja_machines.dmi'
+	icon_state = "terminal"
 	z_restricted = FALSE
+
+/obj/structure/machinery/computer/cryopod/upp
+	cryotype = FACTION_UPP
 
 /obj/structure/machinery/computer/cryopod/attack_remote()
 	src.attack_hand()
@@ -67,10 +72,10 @@ GLOBAL_LIST_INIT(frozen_items, list(SQUAD_MARINE_1 = list(), SQUAD_MARINE_2 = li
 	var/dat
 
 	dat += "<i>Welcome, [user.real_name].</i><br/><br/><hr/>"
-	dat += "<a href='?src=\ref[src];log=1'>View storage log</a>.<br>"
-	dat += "<a href='?src=\ref[src];view=1'>View objects</a>.<br>"
-	dat += "<a href='?src=\ref[src];item=1'>Recover object</a>.<br>"
-	dat += "<a href='?src=\ref[src];allitems=1'>Recover all objects</a>.<br>"
+	dat += "<a href='byond://?src=\ref[src];log=1'>View storage log</a>.<br>"
+	dat += "<a href='byond://?src=\ref[src];view=1'>View objects</a>.<br>"
+	dat += "<a href='byond://?src=\ref[src];item=1'>Recover object</a>.<br>"
+	dat += "<a href='byond://?src=\ref[src];allitems=1'>Recover all objects</a>.<br>"
 
 	show_browser(user, dat, "Cryogenic Oversight Control for [cryotype]", "cryopod_console")
 
@@ -163,7 +168,7 @@ GLOBAL_LIST_INIT(frozen_items, list(SQUAD_MARINE_1 = list(), SQUAD_MARINE_2 = li
 //Cryopods themselves.
 /obj/structure/machinery/cryopod
 	name = "hypersleep chamber"
-	desc = "A large automated capsule with LED displays intended to put anyone inside into 'hypersleep', a form of non-cryogenic statis used on most ships, linked to a long-term hypersleep bay on a lower level."
+	desc = "A large automated capsule with LED displays intended to put anyone inside into 'hypersleep', a form of non-cryogenic stasis used on most ships, linked to a long-term hypersleep bay on a lower level."
 	icon = 'icons/obj/structures/machinery/cryogenics.dmi'
 	icon_state = "body_scanner_open"
 	density = TRUE
@@ -174,9 +179,17 @@ GLOBAL_LIST_INIT(frozen_items, list(SQUAD_MARINE_1 = list(), SQUAD_MARINE_2 = li
 	var/time_till_despawn = 10 MINUTES //10 minutes-ish safe period before being despawned.
 	var/time_entered = 0 //Used to keep track of the safe period.
 	var/silent_exit = FALSE
-	var/obj/item/device/radio/intercom/announce //Intercom for cryo announcements
+	var/obj/item/device/radio/intercom/announce //Intercom for cryo announcements.
+	var/no_store_pod = FALSE
+	var/willing = FALSE //True when occupant entered by themselves or agreed to be put inside.
 
 /obj/structure/machinery/cryopod/right
+	dir = WEST
+
+/obj/structure/machinery/cryopod/no_store
+	no_store_pod = TRUE
+
+/obj/structure/machinery/cryopod/no_store/right
 	dir = WEST
 
 /obj/structure/machinery/cryopod/Initialize()
@@ -193,10 +206,7 @@ GLOBAL_LIST_INIT(frozen_items, list(SQUAD_MARINE_1 = list(), SQUAD_MARINE_2 = li
 //Lifted from Unity stasis.dm and refactored. ~Zuhayr
 /obj/structure/machinery/cryopod/process()
 	if(occupant && !(occupant in GLOB.freed_mob_list)) //ignore freed mobs
-		//if occupant ghosted, time till despawn is severely shorter
-		if(!occupant.key && time_till_despawn == 10 MINUTES)
-			time_till_despawn -= 8 MINUTES
-		//Allow a ten minute gap between entering the pod and actually despawning.
+		//Allow a gap between entering the pod and actually despawning.
 		if(world.time - time_entered < time_till_despawn)
 			return
 
@@ -222,17 +232,23 @@ GLOBAL_LIST_INIT(frozen_items, list(SQUAD_MARINE_1 = list(), SQUAD_MARINE_2 = li
 
 	var/list/dept_console = GLOB.frozen_items["REQ"]
 	if(ishuman(occupant))
-		var/mob/living/carbon/human/H = occupant
-		switch(H.job)
-			if(JOB_POLICE, JOB_WARDEN, JOB_CHIEF_POLICE)
+		var/mob/living/carbon/human/cryo_human = occupant
+		switch(cryo_human.job)
+			if(JOB_POLICE, JOB_POLICE_HG, JOB_WARDEN, JOB_CHIEF_POLICE)
 				dept_console = GLOB.frozen_items["MP"]
-			if("Nurse", "Doctor","Researcher","Chief Medical Officer")
+			if(JOB_NURSE, JOB_DOCTOR, JOB_FIELD_DOCTOR, JOB_RESEARCHER, JOB_CMO)
 				dept_console = GLOB.frozen_items["Med"]
-			if("Maintenance Technician", "Ordnance Technician","Chief Engineer")
+			if(JOB_MAINT_TECH, JOB_ORDNANCE_TECH, JOB_CHIEF_ENGINEER)
 				dept_console = GLOB.frozen_items["Eng"]
-			if("Predator")
-				dept_console = GLOB.frozen_items["Yautja"]
-		H.species.handle_cryo(H)
+
+
+		if(cryo_human.faction != FACTION_MARINE)
+			dept_console = GLOB.frozen_items[cryo_human.faction]
+
+		if(cryo_human.job in FAX_RESPONDER_JOB_LIST)
+			cryo_human.despawn_fax_responder()
+
+		cryo_human.species.handle_cryo(cryo_human)
 
 	var/list/deleteempty = list(/obj/item/storage/backpack/marine/satchel)
 
@@ -254,7 +270,7 @@ GLOBAL_LIST_INIT(frozen_items, list(SQUAD_MARINE_1 = list(), SQUAD_MARINE_2 = li
 
 	item_loop:
 		for(var/obj/item/W in items)
-			if(((W.flags_inventory & CANTSTRIP) || (W.flags_item & NODROP) || (W.flags_item & NO_CRYO_STORE)) && !isyautja(occupant)) //We don't keep donor items, undroppable/unremovable items, and specifically filtered items
+			if((W.flags_inventory & CANTSTRIP) || (W.flags_item & NODROP) || (W.flags_item & NO_CRYO_STORE) || gearless_role(occupant)) //We don't keep donor items, undroppable/unremovable items, and specifically filtered items
 				if(istype(W, /obj/item/clothing/suit/storage))
 					var/obj/item/clothing/suit/storage/SS = W
 					for(var/obj/item/I in SS.pockets) //But we keep stuff inside them
@@ -313,6 +329,9 @@ GLOBAL_LIST_INIT(frozen_items, list(SQUAD_MARINE_1 = list(), SQUAD_MARINE_2 = li
 
 	stripped_items:
 		for(var/obj/item/A in strippeditems)
+			if(gearless_role(occupant))
+				qdel(A)
+				continue stripped_items
 			for(var/DAA in deleteall)
 				if(istype(A, DAA))
 					qdel(A)
@@ -322,53 +341,38 @@ GLOBAL_LIST_INIT(frozen_items, list(SQUAD_MARINE_1 = list(), SQUAD_MARINE_2 = li
 			A.moveToNullspace()
 
 	var/datum/job/job = GET_MAPPED_ROLE(occupant.job)
-	if(ishuman(occupant))
-		var/mob/living/carbon/human/H = occupant
-		if(H.assigned_squad)
-			var/datum/squad/S = H.assigned_squad
-			S.forget_marine_in_squad(H)
-			if(istype(job, /datum/job/marine/specialist))
-				//we make the set this specialist took if any available again
-				if(H.skills)
-					var/set_name
-					switch(H.skills.get_skill_level(SKILL_SPEC_WEAPONS))
-						if(SKILL_SPEC_ROCKET)
-							set_name = "Demolitionist Set"
-						if(SKILL_SPEC_GRENADIER)
-							set_name = "Heavy Grenadier Set"
-						if(SKILL_SPEC_PYRO)
-							set_name = "Pyro Set"
-						if(SKILL_SPEC_SCOUT)
-							set_name = "Scout Set"
-						if(SKILL_SPEC_SNIPER)
-							set_name = "Sniper Set"
-							GLOB.available_specialist_sets += "Anti-materiel Sniper Set"
+	if(job)
+		if(ishuman(occupant))
+			var/mob/living/carbon/human/human_cryoing = occupant
+			job.on_cryo(human_cryoing)
+			if(human_cryoing.assigned_squad)
+				var/datum/squad/squad = human_cryoing.assigned_squad
+				squad.forget_marine_in_squad(human_cryoing)
 
-					if(set_name && !GLOB.available_specialist_sets.Find(set_name))
-						GLOB.available_specialist_sets += set_name
+		//Cryoing someone out removes someone from the Marines, blocking further larva spawns until accounted for
+		SSticker.mode.latejoin_update(job, -1)
 
-	//Cryoing someone out removes someone from the Marines, blocking further larva spawns until accounted for
-	SSticker.mode.latejoin_update(job, -1)
+		//Handle job slot/tater cleanup.
+		GLOB.RoleAuthority.free_role(job, TRUE)
 
-	//Handle job slot/tater cleanup.
-	GLOB.RoleAuthority.free_role(GET_MAPPED_ROLE(occupant.job), TRUE)
+		var/occupant_ref = WEAKREF(occupant)
+		//Delete them from datacore.
+		for(var/datum/data/record/found_record_med as anything in GLOB.data_core.medical)
+			if((found_record_med.fields["ref"] == occupant_ref))
+				GLOB.data_core.medical -= found_record_med
+				qdel(found_record_med)
+		for(var/datum/data/record/found_record_sec in GLOB.data_core.security)
+			if((found_record_sec.fields["ref"] == occupant_ref))
+				GLOB.data_core.security -= found_record_sec
+				qdel(found_record_sec)
+		for(var/datum/data/record/found_record_gen in GLOB.data_core.general)
+			if((found_record_gen.fields["ref"] == occupant_ref))
+				GLOB.data_core.general -= found_record_gen
+				qdel(found_record_gen)
+	else
+		log_debug("Attempted to process [occupant] without valid job datum found. Job: [occupant.job]. Likely no job datum for given job exists.")
 
-	var/occupant_ref = WEAKREF(occupant)
-	//Delete them from datacore.
-	for(var/datum/data/record/R as anything in GLOB.data_core.medical)
-		if((R.fields["ref"] == occupant_ref))
-			GLOB.data_core.medical -= R
-			qdel(R)
-	for(var/datum/data/record/T in GLOB.data_core.security)
-		if((T.fields["ref"] == occupant_ref))
-			GLOB.data_core.security -= T
-			qdel(T)
-	for(var/datum/data/record/G in GLOB.data_core.general)
-		if((G.fields["ref"] == occupant_ref))
-			GLOB.data_core.general -= G
-			qdel(G)
-
-	icon_state = "body_scanner_open"
+	icon_state = initial(icon_state)
 	set_light(0)
 
 	if(occupant.key)
@@ -377,100 +381,108 @@ GLOBAL_LIST_INIT(frozen_items, list(SQUAD_MARINE_1 = list(), SQUAD_MARINE_2 = li
 	//Make an announcement and log the person entering storage.
 	GLOB.frozen_crew += "[occupant.real_name] ([occupant.job])"
 
-	if(!isyautja(occupant))
+	if(!gearless_role(occupant))
 		ai_silent_announcement("[occupant.real_name], [occupant.job], has entered long-term hypersleep storage. Belongings moved to hypersleep inventory.")
 	visible_message(SPAN_NOTICE("[src] hums and hisses as it moves [occupant.real_name] into hypersleep storage."))
 
 	//Delete the mob.
+	if(occupant == SSticker.mode.acting_commander)
+		QDEL_NULL(occupant)
+		SSticker.mode.ares_command_check(force=TRUE)
+	else
+		QDEL_NULL(occupant)
 
-	QDEL_NULL(occupant)
 	stop_processing()
 
-/obj/structure/machinery/cryopod/attackby(obj/item/W, mob/living/user)
+/obj/structure/machinery/cryopod/attackby(obj/item/item, mob/living/user)
 	if(isxeno(user))
 		return FALSE
-	if(istype(W, /obj/item/grab))
-		var/obj/item/grab/G = W
+	if(istype(item, /obj/item/grab))
+		var/obj/item/grab/grab_item = item
 		if(occupant)
 			to_chat(user, SPAN_WARNING("[src] is occupied."))
 			return FALSE
 
-		if(!isliving(G.grabbed_thing))
+		if(!isliving(grab_item.grabbed_thing))
 			return FALSE
 
-		var/willing = FALSE //We don't want to allow people to be forced into despawning.
-		var/mob/living/M = G.grabbed_thing
+		willing = FALSE //We don't want to allow people to be forced into despawning.
+		var/mob/living/grabbed_mob = grab_item.grabbed_thing
 
-		if(M.stat == DEAD) //This mob is dead
-			to_chat(user, SPAN_WARNING("[src] immediately rejects [M]. \He passed away!"))
+		if(grabbed_mob.stat == DEAD) //This mob is dead
+			to_chat(user, SPAN_WARNING("[src] immediately rejects [grabbed_mob]. \He passed away!"))
 			return FALSE
 
-		if(isxeno(M))
-			to_chat(user, SPAN_WARNING("There is no way [src] will accept [M]!"))
+		if(isxeno(grabbed_mob))
+			to_chat(user, SPAN_WARNING("There is no way [src] will accept [grabbed_mob]!"))
 			return FALSE
 
-		if(M.client)
-			if(alert(M,"Would you like to enter cryosleep?", , "Yes", "No") == "Yes")
-				if(!M || !G || !G.grabbed_thing)
+		if(grabbed_mob.client)
+			if(alert(grabbed_mob,"Would you like to enter cryosleep?", , "Yes", "No") == "Yes")
+				if(!grabbed_mob || !grab_item || !grab_item.grabbed_thing)
 					return FALSE
 				willing = TRUE
-		else
-			willing = TRUE
 
-		if(willing)
+		if(willing || !grabbed_mob.client)
 
-			visible_message(SPAN_NOTICE("[user] starts putting [M] into [src]."),
-			SPAN_NOTICE("You start putting [M] into [src]."))
+			visible_message(SPAN_NOTICE("[user] starts putting [grabbed_mob] into [src]."),
+			SPAN_NOTICE("You start putting [grabbed_mob] into [src]."))
 
-			if(!do_after(user, 20, INTERRUPT_ALL, BUSY_ICON_GENERIC)) return
-			if(!M || !G || !G.grabbed_thing) return
+			if(!do_after(user, 20, INTERRUPT_ALL, BUSY_ICON_GENERIC))
+				return
+			if(!grabbed_mob || !grab_item || !grab_item.grabbed_thing)
+				return
 			if(occupant)
 				to_chat(user, SPAN_WARNING("[src] is occupied."))
 				return FALSE
 
-			go_in_cryopod(M)
+			go_in_cryopod(grabbed_mob)
 
 			//Book keeping!
 			var/area/location = get_area(src)
-			message_admins("[key_name_admin(user)] put [key_name_admin(M)], [M.job] into [src] at [location].")
+			message_admins("[key_name_admin(user)] put [key_name_admin(grabbed_mob)], [grabbed_mob.job] into [src] at [location].")
 
 			//Despawning occurs when process() is called with an occupant without a client.
 			add_fingerprint(user)
 			return TRUE
 
 /obj/structure/machinery/cryopod/relaymove(mob/user)
-	if(user.is_mob_incapacitated(TRUE))
-		return
-	eject()
+	eject(user, override_confirmation = TRUE)
 
-/obj/structure/machinery/cryopod/verb/eject()
+/obj/structure/machinery/cryopod/verb/eject_verb()
 	set name = "Eject Pod"
 	set category = "Object"
 	set src in oview(1)
-	if(usr.stat != 0)
+
+	eject(usr)
+
+/obj/structure/machinery/cryopod/proc/eject(mob/initiator, override_confirmation = FALSE)
+	if(initiator.is_mob_incapacitated(TRUE))
 		return
 
-	if(occupant != usr)
-		to_chat(usr, SPAN_WARNING("You can't drag people out of hypersleep!"))
+	if(occupant != initiator)
+		to_chat(initiator, SPAN_WARNING("You can't drag people out of hypersleep!"))
 		return
 
-	if(!silent_exit && alert(usr, "Would you like eject out of the hypersleep chamber?", "Confirm", "Yes", "No") != "Yes")
+	var/mob/user = occupant // This alert below sleeps, so we have to doublecheck
+	if(!override_confirmation && !silent_exit && tgui_alert(occupant, "Would you like eject out of the hypersleep chamber?", "Eject from Hypersleep", list("Yes", "No")) != "Yes")
+		return
+	if(user != occupant) // Someone tried to game the system - Bail out
 		return
 
 	go_out() //Not adding a delay for this because for some reason it refuses to work. Not a big deal imo
-	add_fingerprint(usr)
+	add_fingerprint(user) // Now we use user not occupant as the occupant has been ejected
 
-	to_chat(usr, SPAN_NOTICE("You get out of \the [src]."))
+	to_chat(occupant, SPAN_NOTICE("You get out of \the [src]."))
 	if(!silent_exit)
 		visible_message(SPAN_WARNING("\The [src]'s casket starts moving!"))
-		var/mob/living/M = usr
-		var/area/location = get_area(src) //Logs the exit
-		message_admins("[key_name_admin(M)], [M.job], has left [src] at [location].")
+		var/area/location = get_area(user) //Logs the exit
+		message_admins("[key_name_admin(user)], [user.job], has left [src] at [location].")
 
-	var/list/items = src.contents //-Removes items from the chamber
-	if(occupant) items -= occupant
-	if(announce) items -= announce
-
+	// Removes items from the chamber, in case someone drops something
+	var/list/items = contents.Copy()
+	if(announce)
+		items -= announce // Keep the intercom inside the cryopod
 	for(var/obj/item/W in items)
 		W.forceMove(get_turf(src))
 
@@ -502,6 +514,7 @@ GLOBAL_LIST_INIT(frozen_items, list(SQUAD_MARINE_1 = list(), SQUAD_MARINE_2 = li
 			to_chat(usr, SPAN_WARNING("[src] is occupied."))
 			return
 
+		willing = TRUE
 		go_in_cryopod(usr)
 		add_fingerprint(usr)
 
@@ -509,22 +522,27 @@ GLOBAL_LIST_INIT(frozen_items, list(SQUAD_MARINE_1 = list(), SQUAD_MARINE_2 = li
 /obj/structure/machinery/cryopod/proc/go_in_cryopod(mob/mob, silent = FALSE)
 	if(occupant)
 		return
-	mob.forceMove(src)
+
 	occupant = mob
+	//if occupant ghosted, entered willingly or is the aCO, time till despawn is severely shorter
+	if((!occupant.key || willing || (occupant == SSticker.mode.acting_commander)) && time_till_despawn == 10 MINUTES)
+		time_till_despawn -= 9 MINUTES
+
+	occupant.forceMove(src)
 	icon_state = "body_scanner_closed"
 	set_light(2)
 	time_entered = world.time
 	start_processing()
 
 	if(!silent)
-		if(mob.client)
-			to_chat(mob, SPAN_NOTICE("You feel cool air surround you. You go numb as your senses turn inward."))
-			to_chat(mob, SPAN_BOLDNOTICE("If you log out or close your client now, your character will permanently removed from the round in 10 minutes. If you ghost, timer will be decreased to 2 minutes."))
+		if(occupant.client)
+			to_chat(occupant, SPAN_NOTICE("You feel cool air surround you. You go numb as your senses turn inward."))
+			to_chat(occupant, SPAN_BOLDNOTICE("If you ghost or close your client now, your character will permanently removed from the round in 1 minute."))
 			if(!should_block_game_interaction(src)) // Set their queue time now because the client has to actually leave to despawn and at that point the client is lost
-				mob.client.player_details.larva_queue_time = max(mob.client.player_details.larva_queue_time, world.time)
+				occupant.client.player_details.larva_pool_time = max(occupant.client.player_details.larva_pool_time, world.time)
 		var/area/location = get_area(src)
-		if(mob.job != GET_MAPPED_ROLE(JOB_SQUAD_MARINE))
-			message_admins("[key_name_admin(mob)], [mob.job], has entered \a [src] at [location] after playing for [duration2text(world.time - mob.life_time_start)].")
+		if(occupant.job != GET_MAPPED_ROLE(JOB_SQUAD_MARINE))
+			message_admins("[key_name_admin(occupant)], [occupant.job], has entered \a [src] at [location] after playing for [duration2text(world.time - occupant.life_time_start)].")
 		playsound(src, 'sound/machines/hydraulics_3.ogg', 30)
 	silent_exit = silent
 
@@ -534,7 +552,7 @@ GLOBAL_LIST_INIT(frozen_items, list(SQUAD_MARINE_1 = list(), SQUAD_MARINE_2 = li
 	occupant.forceMove(get_turf(src))
 	occupant = null
 	stop_processing()
-	icon_state = "body_scanner_open"
+	icon_state = initial(icon_state)
 	set_light(0)
 	playsound(src, 'sound/machines/pod_open.ogg', 30)
 	SEND_SIGNAL(src, COMSIG_CRYOPOD_GO_OUT)
@@ -557,6 +575,182 @@ GLOBAL_LIST_INIT(frozen_items, list(SQUAD_MARINE_1 = list(), SQUAD_MARINE_2 = li
 
 	move_inside(target)
 
+/obj/structure/machinery/cryopod/proc/gearless_role(mob/occupant)
+	if(isyautja(occupant))
+		return TRUE
+	if(no_store_pod)
+		return TRUE
+	if(occupant.faction != FACTION_MARINE)
+		return TRUE
+	return FALSE
+
+/obj/structure/machinery/cryopod/joe/seegson // joe storage closets
+	icon = 'icons/obj/structures/machinery/working_joe_storage.dmi'
+	icon_state = "working_joe_storage_empty"
+	unslashable = TRUE
+	unacidable = TRUE
+	no_store_pod = TRUE
+	explo_proof = TRUE
+
+/obj/structure/machinery/cryopod/joe/seegson/go_in_cryopod(mob/mob, silent = FALSE)
+	if(!isworkingjoe(mob))
+		to_chat(mob, SPAN_NOTICE("This isn't for you!"))
+		return
+	if(occupant)
+		return
+	mob.forceMove(src)
+	occupant = mob
+	icon_state = "working_joe_storage_bluebag[rand(1,2)]"
+	set_light(2)
+	time_entered = world.time
+	start_processing()
+
+	if(!silent)
+		if(mob.client)
+			to_chat(mob, SPAN_BOLDNOTICE("If you log out or close your client now, your character will permanently removed from the round in 10 minutes. If you ghost, timer will be decreased to 2 minutes."))
+			if(!should_block_game_interaction(src)) // Set their queue time now because the client has to actually leave to despawn and at that point the client is lost
+				mob.client.player_details.larva_pool_time = max(mob.client.player_details.larva_pool_time, world.time)
+		var/area/location = get_area(src)
+		if(mob.job != GET_MAPPED_ROLE(JOB_SQUAD_MARINE))
+			message_admins("[key_name_admin(mob)], [mob.job], has entered \a [src] at [location] after playing for [duration2text(world.time - mob.life_time_start)].")
+		playsound(src, 'sound/items/zip.ogg', 30)
+	silent_exit = silent
+
+/obj/structure/machinery/cryopod/joe/seegson/go_out()
+	if(!occupant)
+		return
+	occupant.forceMove(get_turf(src))
+	occupant = null
+	stop_processing()
+	icon_state = "working_joe_storage_bluebag_empty"
+	set_light(0)
+	playsound(src, 'sound/items/zip.ogg', 30)
+	SEND_SIGNAL(src, COMSIG_CRYOPOD_GO_OUT)
+
+/obj/structure/machinery/cryopod/joe/seegson/alt
+	icon_state = "working_joe_storage_empty_alt"
+	unslashable = TRUE
+	unacidable = TRUE
+	no_store_pod = TRUE
+
+/obj/structure/machinery/cryopod/joe/seegson/alt/go_in_cryopod(mob/mob, silent = FALSE)
+	if(!isworkingjoe(mob))
+		to_chat(mob, SPAN_NOTICE("This isn't for you!"))
+		return
+	if(occupant)
+		return
+	mob.forceMove(src)
+	occupant = mob
+	icon_state = "working_joe_storage_bluebag[rand(1,2)]_alt"
+	set_light(2)
+	time_entered = world.time
+	start_processing()
+
+	if(!silent)
+		if(mob.client)
+			to_chat(mob, SPAN_BOLDNOTICE("If you log out or close your client now, your character will permanently removed from the round in 10 minutes. If you ghost, timer will be decreased to 2 minutes."))
+			if(!should_block_game_interaction(src)) // Set their queue time now because the client has to actually leave to despawn and at that point the client is lost
+				mob.client.player_details.larva_pool_time = max(mob.client.player_details.larva_pool_time, world.time)
+		var/area/location = get_area(src)
+		if(mob.job != GET_MAPPED_ROLE(JOB_SQUAD_MARINE))
+			message_admins("[key_name_admin(mob)], [mob.job], has entered \a [src] at [location] after playing for [duration2text(world.time - mob.life_time_start)].")
+		playsound(src, 'sound/items/zip.ogg', 30)
+	silent_exit = silent
+
+/obj/structure/machinery/cryopod/joe/seegson/alt/go_out()
+	if(!occupant)
+		return
+	occupant.forceMove(get_turf(src))
+	occupant = null
+	stop_processing()
+	icon_state = "working_joe_storage_bluebag_empty_alt"
+	set_light(0)
+	playsound(src, 'sound/items/zip.ogg', 30)
+	SEND_SIGNAL(src, COMSIG_CRYOPOD_GO_OUT)
+
+/obj/structure/machinery/cryopod/joe/weyland
+	icon = 'icons/obj/structures/machinery/working_joe_storage.dmi'
+	icon_state = "working_joe_storage_empty_dark"
+	unslashable = TRUE
+	unacidable = TRUE
+	no_store_pod = TRUE
+	explo_proof = TRUE
+
+/obj/structure/machinery/cryopod/joe/weyland/go_in_cryopod(mob/mob, silent = FALSE)
+	if(!isworkingjoe(mob))
+		to_chat(mob, SPAN_NOTICE("This isn't for you!"))
+		return
+	if(occupant)
+		return
+	mob.forceMove(src)
+	occupant = mob
+	icon_state = "working_joe_storage_orangebag[rand(1,2)]_dark"
+	set_light(2)
+	time_entered = world.time
+	start_processing()
+
+	if(!silent)
+		if(mob.client)
+			to_chat(mob, SPAN_BOLDNOTICE("If you log out or close your client now, your character will permanently removed from the round in 10 minutes. If you ghost, timer will be decreased to 2 minutes."))
+			if(!should_block_game_interaction(src)) // Set their queue time now because the client has to actually leave to despawn and at that point the client is lost
+				mob.client.player_details.larva_pool_time = max(mob.client.player_details.larva_pool_time, world.time)
+		var/area/location = get_area(src)
+		if(mob.job != GET_MAPPED_ROLE(JOB_SQUAD_MARINE))
+			message_admins("[key_name_admin(mob)], [mob.job], has entered \a [src] at [location] after playing for [duration2text(world.time - mob.life_time_start)].")
+		playsound(src, 'sound/items/zip.ogg', 30)
+	silent_exit = silent
+
+/obj/structure/machinery/cryopod/joe/weyland/go_out()
+	if(!occupant)
+		return
+	occupant.forceMove(get_turf(src))
+	occupant = null
+	stop_processing()
+	icon_state = "working_joe_storage_orangebag_empty_dark"
+	set_light(0)
+	playsound(src, 'sound/items/zip.ogg', 30)
+	SEND_SIGNAL(src, COMSIG_CRYOPOD_GO_OUT)
+
+/obj/structure/machinery/cryopod/joe/weyland/alt
+	icon_state = "working_joe_storage_alt_empty_dark"
+	unslashable = TRUE
+	unacidable = TRUE
+	no_store_pod = TRUE
+
+/obj/structure/machinery/cryopod/joe/weyland/alt/go_in_cryopod(mob/mob, silent = FALSE)
+	if(!isworkingjoe(mob))
+		to_chat(mob, SPAN_NOTICE("This isn't for you!"))
+		return
+	if(occupant)
+		return
+	mob.forceMove(src)
+	occupant = mob
+	icon_state = "working_joe_storage_orangebag[rand(1,2)]_alt_dark"
+	set_light(2)
+	time_entered = world.time
+	start_processing()
+
+	if(!silent)
+		if(mob.client)
+			to_chat(mob, SPAN_BOLDNOTICE("If you log out or close your client now, your character will permanently removed from the round in 10 minutes. If you ghost, timer will be decreased to 2 minutes."))
+			if(!should_block_game_interaction(src)) // Set their queue time now because the client has to actually leave to despawn and at that point the client is lost
+				mob.client.player_details.larva_pool_time = max(mob.client.player_details.larva_pool_time, world.time)
+		var/area/location = get_area(src)
+		if(mob.job != GET_MAPPED_ROLE(JOB_SQUAD_MARINE))
+			message_admins("[key_name_admin(mob)], [mob.job], has entered \a [src] at [location] after playing for [duration2text(world.time - mob.life_time_start)].")
+		playsound(src, 'sound/items/zip.ogg', 30)
+	silent_exit = silent
+
+/obj/structure/machinery/cryopod/joe/weyland/alt/go_out()
+	if(!occupant)
+		return
+	occupant.forceMove(get_turf(src))
+	occupant = null
+	stop_processing()
+	icon_state = "working_joe_storage_orangebag_alt_empty_dark"
+	set_light(0)
+	playsound(src, 'sound/items/zip.ogg', 30)
+	SEND_SIGNAL(src, COMSIG_CRYOPOD_GO_OUT)
 
 /obj/structure/machinery/cryopod/tutorial
 	silent_exit = TRUE
@@ -582,7 +776,7 @@ GLOBAL_LIST_INIT(frozen_items, list(SQUAD_MARINE_1 = list(), SQUAD_MARINE_2 = li
 		var/mob/living/carbon/human/man = occupant
 		man.species.handle_cryo(man)
 
-	icon_state = "body_scanner_open"
+	icon_state = initial(icon_state)
 	set_light(0)
 
 
@@ -593,3 +787,10 @@ GLOBAL_LIST_INIT(frozen_items, list(SQUAD_MARINE_1 = list(), SQUAD_MARINE_2 = li
 
 	occupant.mind.transfer_to(new_player)
 	SEND_SIGNAL(occupant, COMSIG_MOB_END_TUTORIAL)
+
+/obj/structure/machinery/cryopod/no_store/yautja
+	icon = 'icons/obj/structures/machinery/yautja_machines.dmi'
+
+/obj/structure/machinery/cryopod/no_store/right/yautja
+	icon = 'icons/obj/structures/machinery/yautja_machines.dmi'
+	dir = WEST

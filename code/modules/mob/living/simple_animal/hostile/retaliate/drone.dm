@@ -56,7 +56,7 @@
 		projectilesound = 'sound/weapons/pulse2.ogg'
 	ion_trail = new
 	ion_trail.set_up(src)
-	ion_trail.start()
+	ion_trail.start(do_NOT_delete = TRUE)
 
 /mob/living/simple_animal/hostile/retaliate/malf_drone/Process_Spacemove(check_drift = 0)
 	return 1
@@ -85,7 +85,7 @@
 
 	//repair a bit of damage
 	if(prob(1))
-		src.visible_message(SPAN_DANGER("[icon2html(src, viewers(src))] [src] shudders and shakes as some of it's damaged systems come back online."))
+		src.visible_message(SPAN_DANGER("[icon2html(src, viewers(src))] [src] shudders and shakes as some of its damaged systems come back online."))
 		var/datum/effect_system/spark_spread/s = new /datum/effect_system/spark_spread
 		s.set_up(3, 1, src)
 		s.start()
@@ -175,44 +175,45 @@
 	spark.holder = null
 	var/obj/loot
 
+	var/list/reachable_atoms = dview(7, src)
 	//shards
 	loot = new /obj/item/shard(loc)
-	step_to(loot, get_turf(pick(view(7, src))))
+	step_to(loot, get_turf(pick(reachable_atoms)))
 	if(prob(75))
 		loot = new /obj/item/shard(loc)
-		step_to(loot, get_turf(pick(view(7, src))))
+		step_to(loot, get_turf(pick(reachable_atoms)))
 	if(prob(50))
 		loot = new /obj/item/shard(loc)
-		step_to(loot, get_turf(pick(view(7, src))))
+		step_to(loot, get_turf(pick(reachable_atoms)))
 	if(prob(25))
 		loot = new /obj/item/shard(loc)
-		step_to(loot, get_turf(pick(view(7, src))))
+		step_to(loot, get_turf(pick(reachable_atoms)))
 
 	//rods
 	loot = new /obj/item/stack/rods(loc)
-	step_to(loot, get_turf(pick(view(7, src))))
+	step_to(loot, get_turf(pick(reachable_atoms)))
 	if(prob(75))
 		loot = new /obj/item/stack/rods(loc)
-		step_to(loot, get_turf(pick(view(7, src))))
+		step_to(loot, get_turf(pick(reachable_atoms)))
 	if(prob(50))
 		loot = new /obj/item/stack/rods(loc)
-		step_to(loot, get_turf(pick(view(7, src))))
+		step_to(loot, get_turf(pick(reachable_atoms)))
 	if(prob(25))
 		loot = new /obj/item/stack/rods(loc)
-		step_to(loot, get_turf(pick(view(7, src))))
+		step_to(loot, get_turf(pick(reachable_atoms)))
 
 	//plasteel
 	loot = new /obj/item/stack/sheet/plasteel(loc)
-	step_to(loot, get_turf(pick(view(7, src))))
+	step_to(loot, get_turf(pick(reachable_atoms)))
 	if(prob(75))
 		loot = new /obj/item/stack/sheet/plasteel(loc)
-		step_to(loot, get_turf(pick(view(7, src))))
+		step_to(loot, get_turf(pick(reachable_atoms)))
 	if(prob(50))
 		loot = new /obj/item/stack/sheet/plasteel(loc)
-		step_to(loot, get_turf(pick(view(7, src))))
+		step_to(loot, get_turf(pick(reachable_atoms)))
 	if(prob(25))
 		loot = new /obj/item/stack/sheet/plasteel(loc)
-		step_to(loot, get_turf(pick(view(7, src))))
+		step_to(loot, get_turf(pick(reachable_atoms)))
 
 	return ..()
 

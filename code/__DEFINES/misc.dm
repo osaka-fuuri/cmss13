@@ -32,21 +32,35 @@
 #define EXPLOSION_FALLOFF_SHAPE_LINEAR   0
 #define EXPLOSION_FALLOFF_SHAPE_EXPONENTIAL  1
 #define EXPLOSION_FALLOFF_SHAPE_EXPONENTIAL_HALF 2
-
+#define EXPLOSION_FALLOFF_SHAPE_EXPONENTIAL_IN_PYLON  3
+#define EXPLOSION_FALLOFF_SHAPE_EXPONENTIAL_HALF_IN_PYLON  4
 #define EXPLOSION_MAX_POWER 5000
 
 //area flags
 
 /// used to make mobs skip bioscans
 #define AREA_AVOID_BIOSCAN (1<<0)
-/// makes it so the area can not be tunneled to
-#define AREA_NOTUNNEL (1<<1)
+/// makes it so the area can not be burrowed into or burrow from there.
+#define AREA_NOBURROW (1<<1)
 /// xenos can join whilst in this area (for admin zlevel)
 #define AREA_ALLOW_XENO_JOIN (1<<2)
 /// Flags the area as a containment area
 #define AREA_CONTAINMENT (1<<3)
 /// Flags the area as permanently unweedable. Still requires is_resin_allowed = FALSE
 #define AREA_UNWEEDABLE (1<<4)
+/// Flags the area as having purpose by the Yautja, and exempt from gear tracking.
+#define AREA_YAUTJA_GROUNDS (1<<5)
+/// Flags the area as a hunting grounds for the Yautja, sometimes blocking game interaction.
+#define AREA_YAUTJA_HUNTING_GROUNDS (1<<6)
+/// Flags the area as hangable, allowing the hanging of skinned bodies.
+#define AREA_YAUTJA_HANGABLE (1<<7)
+/// Makes it so barricades can't be anchored and starts unsecured.
+#define AREA_NOSECURECADES (1<<8)
+/// Flags the area, preventing the creation of xeno tunnels, overwriting can_dig_xeno_tunnel.
+#define AREA_NOTUNNEL (1<<9)
+/// Flags the area as heavily ventilated clearing most /obj/effect/particle_effect in a few ticks.
+#define AREA_HEAVILY_VENTILATED (1<<10)
+
 /// Default number of ticks for do_after
 #define DA_DEFAULT_NUM_TICKS 5
 
@@ -105,6 +119,7 @@
 #define INTERRUPT_ALL_OUT_OF_RANGE  (INTERRUPT_ALL & (~INTERRUPT_DIFF_TURF)|INTERRUPT_OUT_OF_RANGE)
 #define INTERRUPT_MOVED  (INTERRUPT_DIFF_LOC|INTERRUPT_DIFF_TURF|INTERRUPT_RESIST)
 #define INTERRUPT_NO_NEEDHAND    (INTERRUPT_ALL & (~INTERRUPT_NEEDHAND))
+#define INTERRUPT_NO_FLOORED    (INTERRUPT_ALL & (~INTERRUPT_KNOCKED_DOWN))
 #define INTERRUPT_INCAPACITATED  (INTERRUPT_UNCONSCIOUS|INTERRUPT_KNOCKED_DOWN|INTERRUPT_STUNNED|INTERRUPT_RESIST)
 #define INTERRUPT_CLICK  (INTERRUPT_LCLICK|INTERRUPT_RCLICK|INTERRUPT_SHIFTCLICK|INTERRUPT_ALTCLICK|INTERRUPT_CTRLCLICK|INTERRUPT_MIDDLECLICK|INTERRUPT_RESIST)
 
@@ -156,7 +171,7 @@
 #define ASSEMBLY_UNLOCKED 1
 #define ASSEMBLY_LOCKED 2
 
-// RESEARCH UPGRADES DEFINES //
+// RESEARCH DEFINES //
 
 // Matrix CAS Upgrades
 #define MATRIX_DEFAULT 0
@@ -185,8 +200,7 @@
 #define EMERGENCY_PLATE_OD_WARNING 1
 #define EMERGENCY_PLATE_ADJUSTED_WARNING 2
 
-
-// RESEARCH UPGRADES DEFINES END
+// RESEARCH DEFINES END
 
 // Statistics defines
 #define STATISTIC_XENO "xeno"
@@ -294,6 +308,7 @@
 //ghost vision mode pref settings
 #define GHOST_VISION_LEVEL_NO_NVG "No Night Vision"
 #define GHOST_VISION_LEVEL_MID_NVG "Half Night Vision"
+#define GHOST_VISION_LEVEL_HIGH_NVG "Three Quarters Night Vision"
 #define GHOST_VISION_LEVEL_FULL_NVG "Full Night Vision"
 
 //Ghost orbit types:
@@ -315,3 +330,5 @@
 
 // magic value to use for indicating a proc slept
 #define PROC_RETURN_SLEEP -1
+
+#define RIDING_OFFSET_ALL "ALL"

@@ -11,7 +11,7 @@
 
 /obj/structure/bed/chair/wheelchair/handle_rotation()
 	overlays.Cut()
-	var/image/O = image(icon = 'icons/obj/objects.dmi', icon_state = "w_overlay", layer = FLY_LAYER, dir = src.dir)
+	var/image/O = image(icon = 'icons/obj/structures/props/furniture/chairs.dmi', icon_state = "w_overlay", layer = FLY_LAYER, dir = src.dir)
 	overlays += O
 	if(buckled_mob)
 		buckled_mob.setDir(dir)
@@ -36,16 +36,16 @@
 			move_delay += 4 //harder to move a wheelchair with a single hand
 			working_hands--
 		else if((left_hand.status & LIMB_BROKEN) && !(left_hand.status & LIMB_SPLINTED))
-			move_delay++
+			move_delay ++
 		if(!right_hand || (right_hand.status & LIMB_DESTROYED))
 			move_delay += 4
 			working_hands--
 		else if((right_hand.status & LIMB_BROKEN) && !(right_hand.status & LIMB_SPLINTED))
-			move_delay += 2
+			move_delay++
 		if(!working_hands)
 			return // No hands to drive your chair? Tough luck!
-		if(driver.pulling && driver.pulling.drag_delay && driver.get_pull_miltiplier()) //Dragging stuff can slow you down a bit.
-			var/pull_delay = driver.pulling.get_pull_drag_delay() * driver.get_pull_miltiplier()
+		if(driver.pulling && driver.pulling.drag_delay && driver.get_pull_multiplier()) //Dragging stuff can slow you down a bit.
+			var/pull_delay = driver.pulling.get_pull_drag_delay() * driver.get_pull_multiplier()
 			move_delay += max(driver.pull_speed + pull_delay + 3*driver.grab_level, 0) //harder grab makes you slower
 
 		if(isgun(driver.get_active_hand())) //Wheelchair user has a gun out, so obviously can't move
@@ -68,7 +68,8 @@
 
 /obj/structure/bed/chair/wheelchair/Collide(atom/A)
 	..()
-	if(!buckled_mob) return
+	if(!buckled_mob)
+		return
 
 	if(propelled)
 		var/mob/living/occupant = buckled_mob

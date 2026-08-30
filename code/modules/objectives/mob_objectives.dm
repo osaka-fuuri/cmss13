@@ -8,7 +8,9 @@
 	controller = TREE_MARINE
 	/// List of list of active corpses per tech-faction ownership
 	var/list/corpses = list()
-	var/list/scored_corpses = list()
+	var/list/scored_other_corpses = list()
+	var/list/scored_humansynth_corpses = list()
+	var/max_humans = FALSE
 
 /datum/cm_objective/recover_corpses/New()
 	. = ..()
@@ -30,18 +32,18 @@
 		var/obj/effect/landmark/corpsespawner/spawner = pick(objective_spawn_corpse)
 		var/turf/spawnpoint = get_turf(spawner)
 		if(spawnpoint)
-			var/mob/living/carbon/human/M = new /mob/living/carbon/human(spawnpoint)
-			M.create_hud() //Need to generate hud before we can equip anything apparently...
-			arm_equipment(M, spawner.equip_path, TRUE, FALSE)
+			var/mob/living/carbon/human/human_mob = new /mob/living/carbon/human(spawnpoint)
+			human_mob.create_hud() //Need to generate hud before we can equip anything apparently...
+			arm_equipment(human_mob, spawner.equip_path, TRUE, FALSE)
 			for(var/obj/structure/bed/nest/found_nest in spawnpoint)
 				for(var/turf/the_turf in list(get_step(found_nest, NORTH),get_step(found_nest, EAST),get_step(found_nest, WEST)))
 					if(the_turf.density)
 						found_nest.dir = get_dir(found_nest, the_turf)
 						found_nest.pixel_x = found_nest.buckling_x["[found_nest.dir]"]
 						found_nest.pixel_y = found_nest.buckling_y["[found_nest.dir]"]
-						M.dir = get_dir(the_turf,found_nest)
+						human_mob.dir = get_dir(the_turf,found_nest)
 				if(!found_nest.buckled_mob)
-					found_nest.do_buckle(M,M)
+					found_nest.forced_buckle_mob(human_mob,human_mob)
 		objective_spawn_corpse.Remove(spawner)
 
 /datum/cm_objective/recover_corpses/post_round_start()
@@ -54,7 +56,7 @@
 		return
 
 	// This mob has already been scored before
-	if(LAZYISIN(scored_corpses, dead_mob))
+	if(LAZYISIN(scored_other_corpses, dead_mob) || LAZYISIN(scored_humansynth_corpses, dead_mob))
 		return
 
 	LAZYDISTINCTADD(corpses, dead_mob)
@@ -108,17 +110,25 @@
 			if(1)
 				if(ispredalien(X))
 					value = OBJECTIVE_ABSOLUTE_VALUE
-				else value = OBJECTIVE_LOW_VALUE
+				else
+					value = OBJECTIVE_LOW_VALUE
 			if(2)
 				value = OBJECTIVE_MEDIUM_VALUE
 			if(3)
 				value = OBJECTIVE_EXTREME_VALUE
+			if(4)
+				value = OBJECTIVE_ABSOLUTE_VALUE
 			else
 				if(isqueen(X)) //Queen is Tier 0 for some reason...
 					value = OBJECTIVE_ABSOLUTE_VALUE
 
 	else if(ishumansynth_strict(target))
-		return OBJECTIVE_LOW_VALUE
+		if(length(scored_humansynth_corpses) <= 48) // Limit human corpse recovery to 5 total points (.1 each)
+			return OBJECTIVE_LOW_VALUE
+		if(!max_humans)
+			marine_announcement("Maximum intel points for non-xenomorph corpses has been achieved.", "Intel Announcement", 'sound/misc/notice2.ogg')
+			max_humans = TRUE
+			return OBJECTIVE_LOW_VALUE
 
 	return value
 
@@ -135,13 +145,16 @@
 		// Add points depending on who controls it
 		var/turf/T = get_turf(target)
 		var/area/A = get_area(T)
-		if(istype(A, /area/almayer/medical/morgue) || istype(A, /area/almayer/medical/containment))
+		if(istype(A, /area/almayer/medical/morgue) || istype(A, /area/almayer/medical/containment/cell))
 			SSobjectives.statistics["corpses_recovered"]++
 			SSobjectives.statistics["corpses_total_points_earned"] += corpse_val
 			award_points(corpse_val)
 
 			corpses -= target
-			scored_corpses += target
+			if(ishumansynth_strict(target))
+				scored_humansynth_corpses += target
+			else
+				scored_other_corpses += target
 
 			if (isxeno(target))
 				UnregisterSignal(target, COMSIG_XENO_REVIVED)
@@ -159,6 +172,7 @@
 	var/mob/living/target
 	var/mob_can_die = MOB_CAN_COMPLETE_AFTER_DEATH
 	objective_flags = OBJECTIVE_DO_NOT_TREE
+	controller = TREE_MARINE
 
 
 /datum/cm_objective/move_mob/New(mob/living/survivor)

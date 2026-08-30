@@ -34,7 +34,7 @@
 /obj/item/implant/proc/islegal()
 	return 0
 
-/obj/item/implant/proc/meltdown() //breaks it down, making implant unrecongizible
+/obj/item/implant/proc/meltdown() //breaks it down, making implant unrecongizeable
 	to_chat(imp_in, SPAN_WARNING("You feel something melting inside [part ? "your [part.display_name]" : "you"]!"))
 	if (part)
 		part.take_damage(burn = 15, used_weapon = "Electronics meltdown")
@@ -125,7 +125,8 @@ Implant Specifics:<BR>"}
 
 
 /obj/item/implant/dexplosive/activate(cause)
-	if((!cause) || (!src.imp_in)) return 0
+	if((!cause) || (!src.imp_in))
+		return 0
 	explosion(src, -1, 0, 2, 3, 0)//This might be a bit much, dono will have to see.
 	if(src.imp_in)
 		src.imp_in.gib()
@@ -140,6 +141,7 @@ Implant Specifics:<BR>"}
 	var/elevel = "Localized Limb"
 	var/phrase = "supercalifragilisticexpialidocious"
 	icon_state = "implant_evil"
+	flags_atom = USES_HEARING
 
 /obj/item/implant/explosive/get_data()
 	var/dat = {"
@@ -266,6 +268,7 @@ Implant Specifics:<BR>"}
 /obj/item/implant/chem/Initialize()
 	. = ..()
 	GLOB.chem_implant_list += src
+	create_reagents(50)
 
 /obj/item/implant/chem/Destroy()
 	GLOB.chem_implant_list -= src
@@ -298,7 +301,8 @@ the implant may become unstable and either pre-maturely inject the subject or si
 
 
 /obj/item/implant/chem/activate(cause)
-	if((!cause) || (!src.imp_in)) return 0
+	if((!cause) || (!src.imp_in))
+		return 0
 	var/mob/living/carbon/R = src.imp_in
 	src.reagents.trans_to(R, cause)
 	to_chat(R, "You hear a faint *beep*.")
@@ -325,10 +329,6 @@ the implant may become unstable and either pre-maturely inject the subject or si
 	spawn(20)
 		malfunction--
 
-/obj/item/implant/chem/Initialize()
-	. = ..()
-	create_reagents(50)
-
 /obj/item/implant/loyalty
 	name = "loyalty implant"
 	desc = "Makes you loyal or such."
@@ -342,13 +342,15 @@ the implant may become unstable and either pre-maturely inject the subject or si
 <HR>
 <b>Implant Details:</b><BR>
 <b>Function:</b> Marks the host as WY property and allow special monitoring functions.<BR>
-<b>Special Features:</b> Will make the host more resistent to brainwashing techniques.<BR>
+<b>Special Features:</b> Will make the host more resistant to brainwashing techniques.<BR>
 <b>Integrity:</b> Implant will last approximately ten years."}
 	return dat
 
 /obj/item/implant/loyalty/implanted(mob/M)
-	if(!ishuman(M)) return
-	if(isyautja(M)) return
+	if(!ishuman(M))
+		return
+	if(isyautja(M))
+		return
 	var/mob/living/carbon/human/H = M
 	to_chat(H, SPAN_NOTICE("You are now tagged as a WY loyalist and will be monitored by their central headquarters. You retain your free will and mental faculties."))
 	return 1
@@ -376,7 +378,7 @@ the implant may become unstable and either pre-maturely inject the subject or si
 	if (src.uses < 1) return 0
 	if (emote == "pale")
 		src.uses--
-		to_chat(source, SPAN_NOTICE(" You feel a sudden surge of energy!"))
+		to_chat(source, SPAN_NOTICE("You feel a sudden surge of energy!"))
 		source.set_effect(0, STUN)
 		source.set_effect(0, WEAKEN)
 		source.set_effect(0, PARALYZE)

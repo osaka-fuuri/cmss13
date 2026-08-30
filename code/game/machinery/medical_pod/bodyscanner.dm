@@ -46,10 +46,10 @@
 		return
 	go_out()
 
-/obj/structure/machinery/medical_pod/bodyscanner/ex_act(severity, datum/cause_data/cause_data)
+/obj/structure/machinery/medical_pod/bodyscanner/ex_act(severity, direction, datum/cause_data/cause_data)
 	for(var/atom/movable/A as mob|obj in src)
 		A.forceMove(loc)
-		A.ex_act(severity, , cause_data)
+		A.ex_act(severity, cause_data=cause_data)
 	switch(severity)
 		if(0 to EXPLOSION_THRESHOLD_LOW)
 			if (prob(25))
@@ -127,12 +127,12 @@
 	..()
 	if(stat & BROKEN)
 		icon_state = "body_scannerconsole-p"
+		return
+	if(stat & NOPOWER)
+		spawn(rand(0, 15))
+			icon_state = "body_scannerconsole-p"
 	else
-		if (stat & NOPOWER)
-			spawn(rand(0, 15))
-				src.icon_state = "body_scannerconsole-p"
-		else
-			icon_state = initial(icon_state)
+		icon_state = initial(icon_state)
 
 
 
@@ -180,6 +180,10 @@
 		last_health_display = new(H)
 	else
 		last_health_display.target_mob = H
+
+	// Handle automatic holotags
+	if (user.client?.prefs.auto_holotag >= BODYSCAN_TAG_PATIENTS)
+		H.auto_assign_holotag(user, HOLOCARD_ACCURACY_BODYSCANNER)
 
 	N.fields["last_tgui_scan_result"] = last_health_display.ui_data(user, DETAIL_LEVEL_BODYSCAN)
 	N.fields["autodoc_data"] = generate_autodoc_surgery_list(H)
@@ -390,3 +394,9 @@
 	dat += "</body></html>"
 	return dat
 
+/obj/structure/machinery/medical_pod/bodyscanner/yautja
+	icon = 'icons/obj/structures/machinery/yautja_machines.dmi'
+
+/obj/structure/machinery/body_scanconsole/yautja
+	icon = 'icons/obj/structures/machinery/yautja_machines.dmi'
+	icon_state = "sleeperconsole"

@@ -21,6 +21,7 @@ GLOBAL_LIST(ob_type_fuel_requirements)
 	var/loaded_tray = FALSE
 	var/ob_cannon_busy = FALSE
 	var/is_disabled = FALSE
+	var/action_queued = FALSE
 
 	COOLDOWN_DECLARE(ob_firing_cooldown) //cooldown for shooting the gun
 	var/fire_cooldown_time = 500 SECONDS
@@ -245,7 +246,7 @@ GLOBAL_LIST_EMPTY(orbital_cannon_cancellation)
 	var/obj/structure/ob_ammo/warhead/warhead = tray.warhead
 	tray.warhead = null
 	warhead.moveToNullspace()
-	warhead.warhead_impact(target)
+	warhead.warhead_impact(target, warhead)
 
 	sleep(OB_CRASHING_DOWN)
 
@@ -259,7 +260,7 @@ GLOBAL_LIST_EMPTY(orbital_cannon_cancellation)
 /obj/structure/orbital_tray
 	name = "loading tray"
 	desc = "The orbital cannon's loading tray."
-	icon = 'icons/obj/structures/props/almayer_props64.dmi'
+	icon = 'icons/obj/structures/props/almayer/almayer_props64.dmi'
 	icon_state = "cannon_tray"
 	density = TRUE
 	anchored = TRUE
@@ -353,7 +354,7 @@ GLOBAL_LIST_EMPTY(orbital_cannon_cancellation)
 	throwpass = TRUE
 	climbable = TRUE
 	unacidable = TRUE // issue: being used for defences, solution: abomb
-	icon = 'icons/obj/structures/props/almayer_props.dmi'
+	icon = 'icons/obj/structures/props/almayer/almayer_props.dmi'
 	var/is_solid_fuel = 0
 	var/source_mob
 
@@ -392,10 +393,10 @@ GLOBAL_LIST_EMPTY(orbital_cannon_cancellation)
 
 	var/cancellation_token = rand(0,32000)
 	GLOB.orbital_cannon_cancellation["[cancellation_token]"] = src
-	message_admins(FONT_SIZE_XL("<A HREF='?_src_=admin_holder;[HrefToken(forceGlobal = TRUE)];admincancelob=1;cancellation=[cancellation_token]'>CLICK TO CANCEL THIS OB</a>"))
+	message_admins(FONT_SIZE_XL("<A href='byond://?_src_=admin_holder;[HrefToken(forceGlobal = TRUE)];admincancelob=1;cancellation=[cancellation_token]'>CLICK TO CANCEL THIS OB</a>"))
 
 	var/relative_dir
-	for(var/mob/M in urange(30, target))
+	for(var/mob/M in long_range(30, target))
 		if(get_turf(M) == target)
 			relative_dir = 0
 		else
@@ -406,7 +407,7 @@ GLOBAL_LIST_EMPTY(orbital_cannon_cancellation)
 		)
 	sleep(OB_TRAVEL_TIMING/3)
 
-	for(var/mob/M in urange(25, target))
+	for(var/mob/M in long_range(25, target))
 		if(get_turf(M) == target)
 			relative_dir = 0
 		else
@@ -417,7 +418,7 @@ GLOBAL_LIST_EMPTY(orbital_cannon_cancellation)
 		)
 	sleep(OB_TRAVEL_TIMING/3)
 
-	for(var/mob/M in urange(15, target))
+	for(var/mob/M in long_range(15, target))
 		M.show_message( \
 			SPAN_HIGHDANGER("OH GOD THE SKY WILL EXPLODE!!!"), SHOW_MESSAGE_VISIBLE, \
 			SPAN_HIGHDANGER("YOU SHOULDN'T BE HERE!"), SHOW_MESSAGE_AUDIBLE \
@@ -435,7 +436,7 @@ GLOBAL_LIST_EMPTY(orbital_cannon_cancellation)
 
 	var/radius_size = 30
 
-	for(var/mob/living/user in urange(radius_size, epicenter))
+	for(var/mob/living/user in long_range(radius_size, epicenter))
 
 		var/distance = get_accurate_dist(get_turf(user), epicenter)
 		var/distance_percent = ((radius_size - distance) / radius_size)
@@ -467,33 +468,36 @@ GLOBAL_LIST_EMPTY(orbital_cannon_cancellation)
 	var/clear_delay = 3
 	var/double_explosion_delay = 6
 
-/obj/structure/ob_ammo/warhead/explosive/warhead_impact(turf/target)
+/obj/structure/ob_ammo/warhead/explosive/warhead_impact(turf/target, obj/structure/ob_ammo/warhead/warhead)
 	. = ..()
 	if (!.)
 		return
 
 	new /obj/effect/overlay/temp/blinking_laser (target)
+	new /obj/effect/overlay/temp/ob_impact (target, warhead, 1.5)
 	sleep(10)
-	var/datum/cause_data/cause_data = create_cause_data(initial(name), source_mob)
-	cell_explosion(target, clear_power, clear_falloff, EXPLOSION_FALLOFF_SHAPE_LINEAR, null, cause_data) //break shit around
+	var/datum/cause_data/cause_data = create_cause_data(name, source_mob)
+	cell_explosion(target, clear_power, clear_falloff, EXPLOSION_FALLOFF_SHAPE_EXPONENTIAL_IN_PYLON, null, cause_data) //break shit around
 	sleep(clear_delay)
 
 	// Explosion if turf is not a wall.
 	if(!target.density)
-		cell_explosion(target, standard_power, standard_falloff, EXPLOSION_FALLOFF_SHAPE_LINEAR, null, cause_data)
+		cell_explosion(target, standard_power, standard_falloff, EXPLOSION_FALLOFF_SHAPE_EXPONENTIAL_IN_PYLON, null, cause_data)
 		handle_ob_shake(target)
-		sleep(double_explosion_delay)
-		cell_explosion(target, standard_power, standard_falloff, EXPLOSION_FALLOFF_SHAPE_LINEAR, null, cause_data)
+		if(double_explosion_delay)
+			sleep(double_explosion_delay)
+			cell_explosion(target, standard_power, standard_falloff, EXPLOSION_FALLOFF_SHAPE_EXPONENTIAL_IN_PYLON, null, cause_data)
 		qdel(src)
 		return
 
 	// Checks turf around the target
 	for(var/turf/T in range(2, target))
 		if(!T.density)
-			cell_explosion(target, standard_power, standard_falloff, EXPLOSION_FALLOFF_SHAPE_LINEAR, null, cause_data)
+			cell_explosion(target, standard_power, standard_falloff, EXPLOSION_FALLOFF_SHAPE_EXPONENTIAL_IN_PYLON, null, cause_data)
 			handle_ob_shake(target)
-			sleep(double_explosion_delay)
-			cell_explosion(target, standard_power, standard_falloff, EXPLOSION_FALLOFF_SHAPE_LINEAR, null, cause_data)
+			if(double_explosion_delay)
+				sleep(double_explosion_delay)
+				cell_explosion(target, standard_power, standard_falloff, EXPLOSION_FALLOFF_SHAPE_EXPONENTIAL_IN_PYLON, null, cause_data)
 			qdel(src)
 			return
 
@@ -515,12 +519,13 @@ GLOBAL_LIST_EMPTY(orbital_cannon_cancellation)
 	var/fire_color = LIGHT_COLOR_CYAN
 	var/fire_type = "white"
 
-/obj/structure/ob_ammo/warhead/incendiary/warhead_impact(turf/target)
+/obj/structure/ob_ammo/warhead/incendiary/warhead_impact(turf/target, obj/structure/ob_ammo/warhead/warhead)
 	. = ..()
 	if (!.)
 		return
 
 	new /obj/effect/overlay/temp/blinking_laser (target)
+	new /obj/effect/overlay/temp/ob_impact (target, warhead)
 	sleep(10)
 	var/datum/cause_data/cause_data = create_cause_data(initial(name), source_mob)
 	cell_explosion(target, clear_power, clear_falloff, EXPLOSION_FALLOFF_SHAPE_LINEAR, null, cause_data) //break shit around
@@ -543,21 +548,18 @@ GLOBAL_LIST_EMPTY(orbital_cannon_cancellation)
 	var/explosion_falloff = 150
 	var/delay_between_clusters = 0.4 SECONDS // how long between each firing?
 
-/obj/structure/ob_ammo/warhead/cluster/warhead_impact(turf/target)
+/obj/structure/ob_ammo/warhead/cluster/warhead_impact(turf/target, obj/structure/ob_ammo/warhead/warhead)
 	. = ..()
 	if (!.)
 		return
 
-	start_cluster(target)
+	start_cluster(target, warhead)
 
-/obj/structure/ob_ammo/warhead/cluster/proc/start_cluster(turf/target)
+/obj/structure/ob_ammo/warhead/cluster/proc/start_cluster(turf/target, obj/structure/ob_ammo/warhead/warhead)
 	set waitfor = 0
 
 	var/range_num = 12
-	var/list/turf_list = list()
-
-	for(var/turf/T in range(range_num, target))
-		turf_list += T
+	var/list/turf_list = RANGE_TURFS(range_num, target)
 
 	for(var/i = 1 to total_amount)
 		for(var/k = 1 to instant_amount)
@@ -567,13 +569,14 @@ GLOBAL_LIST_EMPTY(orbital_cannon_cancellation)
 			var/area/selected_area = get_area(selected_turf)
 			if(CEILING_IS_PROTECTED(selected_area?.ceiling, CEILING_PROTECTION_TIER_4))
 				continue
-			fire_in_a_hole(selected_turf)
+			fire_in_a_hole(selected_turf, warhead)
 
 		sleep(delay_between_clusters)
 	QDEL_IN(src, 5 SECONDS) // Leave time for last handle_ob_shake below
 
-/obj/structure/ob_ammo/warhead/cluster/proc/fire_in_a_hole(turf/loc)
+/obj/structure/ob_ammo/warhead/cluster/proc/fire_in_a_hole(turf/loc, obj/structure/ob_ammo/warhead/warhead)
 	new /obj/effect/overlay/temp/blinking_laser (loc)
+	new /obj/effect/overlay/temp/ob_impact (loc, warhead, 0.5)
 	addtimer(CALLBACK(GLOBAL_PROC, GLOBAL_PROC_REF(cell_explosion), loc, explosion_power, explosion_falloff, EXPLOSION_FALLOFF_SHAPE_LINEAR, null, create_cause_data(initial(name), source_mob)), 1 SECONDS)
 	addtimer(CALLBACK(src, PROC_REF(handle_ob_shake), loc), 1 SECONDS)
 
@@ -613,10 +616,10 @@ GLOBAL_LIST_EMPTY(orbital_cannon_cancellation)
 /obj/structure/machinery/computer/orbital_cannon_console/tgui_interact(mob/user, datum/tgui/ui)
 	ui = SStgui.try_update_ui(user, src, ui)
 	if(!ui)
-		ui = new(user, src, "OrbitalCannonConsole", "[src.name]")
+		ui = new(user, src, "OrbitalCannonConsole", "[capitalize(name)]")
 		ui.open()
 
-/obj/structure/machinery/computer/aa_console/ui_state(mob/user)
+/obj/structure/machinery/computer/orbital_cannon_console/ui_state(mob/user)
 	return GLOB.not_incapacitated_and_adjacent_state
 
 /obj/structure/machinery/computer/orbital_cannon_console/ui_status(mob/user, datum/ui_state/state)
@@ -681,7 +684,7 @@ GLOBAL_LIST_EMPTY(orbital_cannon_cancellation)
 	if(..())
 		return
 
-	if(!skillcheck(user, SKILL_ENGINEER, SKILL_ENGINEER_ENGI))
+	if(!skillcheck(user, SKILL_ENGINEER, SKILL_ENGINEER_TRAINED))
 		to_chat(user, SPAN_WARNING("You have no idea how to use that console."))
 		return TRUE
 

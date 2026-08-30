@@ -1,7 +1,8 @@
 /obj/item/reagent_container/food/snacks/meat
 	name = "meat"
-	desc = "A slab of meat"
+	desc = "A slab of meat."
 	icon_state = "meat"
+	icon = 'icons/obj/items/food/meat.dmi'
 	health = 180
 	filling_color = "#FF1C1C"
 	bitesize = 3
@@ -13,7 +14,7 @@
 	name = made_from_player + name
 
 /obj/item/reagent_container/food/snacks/meat/attackby(obj/item/W as obj, mob/user as mob)
-	if(W.sharp == IS_SHARP_ITEM_ACCURATE || W.sharp == IS_SHARP_ITEM_BIG)
+	if(W.sharp)
 		var/turf/T = get_turf(src)
 		var/cutlet_amt = roll(1,4)
 		for(var/i in 1 to cutlet_amt)
@@ -73,8 +74,8 @@
 /obj/item/reagent_container/food/snacks/meat/fish
 	name = "fish meat"
 	desc = "Meat from a fish."
-	icon_state = "fish_meat"
-	icon = 'icons/obj/items/fishing_atoms.dmi'
+	icon_state = "fishfillet"
+	icon = 'icons/obj/items/food/fish.dmi'
 
 /obj/item/reagent_container/food/snacks/meat/fish/crab
 	name = "crab meat"
@@ -97,3 +98,24 @@
 	desc = "Pink squishy meat from a squid or squid like creature. You're no marine biologist."
 	icon_state = "squid_meat_2"
 
+/obj/item/reagent_container/food/snacks/meat/fish/bass
+	name = "Bass meat"
+	desc = "Sizeable hunks of cooking fish!"
+	icon_state = "bass_meat"
+
+/obj/item/reagent_container/food/snacks/meat/fish/bluegill
+	name = "bluegill meat"
+	desc = "Small strips of pan frying meat!"
+	icon_state = "bluegill_meat"
+
+/obj/item/reagent_container/food/snacks/meat/fish/salmon
+
+	name = "salmon meat"
+	desc = "Considered a 'fancy' cut of fish!"
+	icon_state = "salmon_meat"
+
+/obj/item/reagent_container/food/snacks/meat/fish/white_perch
+
+	name = "white perch meat"
+	desc = "Meat of an invasive fish, its oily.."
+	icon_state = "white_perch_meat"

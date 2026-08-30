@@ -128,17 +128,23 @@
  * You should only pass integers in.
  */
 /proc/pick_weight(list/list_to_pick)
+	if(length(list_to_pick) == 0)
+		return null
+
 	var/total = 0
-	var/item
-	for(item in list_to_pick)
+	for(var/item in list_to_pick)
 		if(!list_to_pick[item])
 			list_to_pick[item] = 0
 		total += list_to_pick[item]
 
-	total = rand(0, total)
-	for(item in list_to_pick)
-		total -= list_to_pick[item]
-		if(total <= 0 && list_to_pick[item])
+	total = rand(1, total)
+	for(var/item in list_to_pick)
+		var/item_weight = list_to_pick[item]
+		if(item_weight == 0)
+			continue
+
+		total -= item_weight
+		if(total <= 0)
 			return item
 
 	return null
@@ -177,3 +183,32 @@
 	for(var/i in 1 to length(inserted_list) - 1)
 		inserted_list.Swap(i, rand(i, length(inserted_list)))
 
+/**
+ * Attempts to convert a numeric keyed alist of (2=second, 1=first) to a list of (first, second).
+ *
+ * If you instead want to discard values and keep only keys, just do list + alist.
+ *
+ * Arguments:
+ * * to_flatten - The alist with sequential numeric keys to extract values from into a normal list.
+ * * assert - Whether to assert every key is numeric and in bounds.
+ */
+/proc/flatten_numeric_alist(alist/to_flatten, assert=TRUE)
+	RETURN_TYPE(/list)
+
+	var/count = length(to_flatten)
+	if(assert)
+		for(var/key in to_flatten)
+			if(!isnum(key) || key < 1 || key > count)
+				CRASH("flatten_numeric_alist not possible for alist: [json_encode(to_flatten)]")
+
+	var/list/retval = list()
+	for(var/i in 1 to count)
+		retval += to_flatten[i]
+	return retval
+
+/proc/list_all(list/to_check, datum/callback/element_check_callback)
+	ASSERT(islist(to_check), "Can only pass a list to check all elements")
+	for (var/element in to_check)
+		if (!element_check_callback.Invoke(element))
+			return FALSE
+	return TRUE

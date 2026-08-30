@@ -1,4 +1,3 @@
-/* eslint-disable func-style */
 /**
  * @file
  * @copyright 2020 Aleksej Komarov
@@ -153,8 +152,13 @@ const TRANSLATIONS = {
 export function decodeHtmlEntities(str: string): string {
   if (!str) return str;
 
-  return (
-    str
+  let currentStr = str;
+  let lastStr = '';
+  let iterations = 0;
+
+  while (currentStr !== lastStr && iterations < 5) {
+    lastStr = currentStr;
+    currentStr = currentStr
       // Newline tags
       .replace(/<br>/gi, '\n')
       .replace(/<\/?[a-z0-9-_]+[^>]*>/gi, '')
@@ -169,6 +173,9 @@ export function decodeHtmlEntities(str: string): string {
       .replace(/&#x?([0-9a-f]+);/gi, (match, numStr) => {
         const num = parseInt(numStr, 16);
         return String.fromCharCode(num);
-      })
-  );
+      });
+    iterations++;
+  }
+
+  return currentStr;
 }

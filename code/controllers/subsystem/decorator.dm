@@ -1,13 +1,13 @@
 // our atom declaration should not be hardcoded for this SS existence.
 // if this subsystem is deleted, stuff still works
 // That's why we define this here
-/atom/proc/Decorate(deferable = FALSE)
+/atom/proc/Decorate(deferrable = FALSE)
 	// Case 1: Early init - Skip it, we'll decorate everything during our init
 	if(!SSdecorator.decoratable)
 		return
 	if(SSdecorator.registered_decorators[type])
 		// Case 2: Deferable, usually non-init mapload - have SS do it later
-		if(deferable)
+		if(deferrable)
 			SSdecorator.decoratable += WEAKREF(src)
 			return
 		// Case 3: In-round spawning, just do it now
@@ -29,7 +29,7 @@ SUBSYSTEM_DEF(decorator)
 	var/list/datum/weakref/currentrun = list()
 
 /datum/controller/subsystem/decorator/Initialize()
-	var/list/all_decors = typesof(/datum/decorator) - list(/datum/decorator) - typesof(/datum/decorator/manual)
+	var/list/all_decors = typesof(/datum/decorator) - list(/datum/decorator) - typesof(/datum/decorator/manual) - typesof(/datum/decorator/gamemode)
 	for(var/decor_type in all_decors)
 		var/datum/decorator/decor = new decor_type()
 		if(!decor.is_active_decor())
@@ -43,13 +43,15 @@ SUBSYSTEM_DEF(decorator)
 				registered_decorators[app_type] = list()
 			registered_decorators[app_type] += decor
 
+	RegisterSignal(SSdcs, COMSIG_GLOB_MODE_PRESETUP, PROC_REF(handle_mode_specific))
+
 	for(var/i in registered_decorators)
 		registered_decorators[i] = sortDecorators(registered_decorators[i])
 
 	decoratable = list() // Put any extras here from there on
 	for(var/atom/object in world)
 		if(!(object.flags_atom & ATOM_DECORATED))
-			object.Decorate(deferable = FALSE)
+			object.Decorate(deferrable = FALSE)
 		CHECK_TICK
 	return SS_INIT_SUCCESS
 
@@ -67,9 +69,28 @@ SUBSYSTEM_DEF(decorator)
 		var/datum/weakref/ref = currentrun[length(currentrun)]
 		currentrun.len--
 		var/atom/A = ref?.resolve()
-		if(A) A.Decorate(deferable = FALSE)
+		if(A)
+			A.Decorate(deferrable = FALSE)
 		if(MC_TICK_CHECK)
 			return
+
+/datum/controller/subsystem/decorator/proc/handle_mode_specific()
+	SIGNAL_HANDLER
+
+	for(var/decorator_type in typesof(/datum/decorator/gamemode))
+		var/datum/decorator/gamemode/gamemode_decorator = new decorator_type()
+
+		if(!istype(SSticker.mode, gamemode_decorator.gamemode))
+			continue
+
+		var/applicable_types = gamemode_decorator.get_decor_types()
+		if(!length(applicable_types))
+			continue
+
+		active_decorators |= gamemode_decorator
+
+		for(var/applicable_type in applicable_types)
+			LAZYADD(registered_decorators[applicable_type], gamemode_decorator)
 
 /datum/controller/subsystem/decorator/proc/add_decorator(decor_type, ...)
 	var/list/arguments = list()

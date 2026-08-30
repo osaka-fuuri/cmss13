@@ -59,11 +59,15 @@
 	flags = EQUIPMENT_PRESET_EXTRA
 
 /datum/equipment_preset/fun/clown/load_gear(mob/living/carbon/human/new_human)
+	new_human.h_style = "Bald"
+	new_human.f_style = "Shaved"
+
 	new_human.equip_to_slot_or_del(new /obj/item/storage/backpack/clown(new_human), WEAR_BACK)
 	new_human.equip_to_slot_or_del(new /obj/item/device/radio/headset(new_human), WEAR_L_EAR)
 	new_human.equip_to_slot_or_del(new /obj/item/clothing/under/rank/clown(new_human), WEAR_BODY)
 	new_human.equip_to_slot_or_del(new /obj/item/clothing/shoes/clown_shoes(new_human), WEAR_FEET)
 	new_human.equip_to_slot_or_del(new /obj/item/clothing/mask/gas/clown_hat(new_human), WEAR_FACE)
+	new_human.equip_to_slot_or_del(new /obj/item/clothing/gloves/white(new_human), WEAR_HANDS)
 
 	new_human.equip_to_slot(new /obj/item/toy/bikehorn(new_human), WEAR_L_STORE)
 	new_human.equip_to_slot(new /obj/item/device/flashlight(new_human), WEAR_R_STORE)
@@ -81,9 +85,11 @@
 	// Cooperate!
 	idtype = /obj/item/card/id/gold
 	assignment = "Shrapnelsworn"
-	rank = "Brother of the Order"
-	paygrade = "Ser"
+	job_title = "Brother of the Order"
+	paygrades = list("Ser" = JOB_PLAYTIME_TIER_0)
 	role_comm_title = "OHEFA"
+
+	minimap_icon = "hefa"
 
 	skills = /datum/skills/specialist
 
@@ -240,7 +246,7 @@
 
 /datum/equipment_preset/fun/santa
 	name = "Fun - Santa"
-	paygrade = PAY_SHORT_CDNM
+	paygrades = list(PAY_SHORT_CDNM = JOB_PLAYTIME_TIER_0)
 	flags = EQUIPMENT_PRESET_EXTRA
 	skills = /datum/skills/everything
 	faction = FACTION_MARINE
@@ -289,10 +295,10 @@
 /datum/equipment_preset/upp/ivan
 	name = "Fun - Ivan"
 	flags = EQUIPMENT_PRESET_EXTRA
-	paygrade = PAY_SHORT_UE6
+	paygrades = list(PAY_SHORT_UE6 = JOB_PLAYTIME_TIER_0)
 	skills = /datum/skills/everything
 	assignment = "UPP Armsmaster"
-	rank = "UPP Armsmaster"
+	job_title = "UPP Armsmaster"
 	role_comm_title = null
 
 /datum/equipment_preset/upp/ivan/load_name(mob/living/carbon/human/new_human, randomise)
@@ -300,7 +306,7 @@
 	new_human.change_real_name(new_human, "Ivan")
 	new_human.f_style = "Shaved"
 	new_human.h_style = "Shaved Head"
-	new_human.skin_color = "pale3"
+	new_human.skin_color = "Pale 3"
 	new_human.r_hair = 165
 	new_human.g_hair = 42
 	new_human.b_hair = 42
@@ -339,12 +345,12 @@
 
 /datum/equipment_preset/fun/van_bandolier
 	name = "Fun - Big Game Hunter"
-	paygrade = PAY_SHORT_CCMO
+	paygrades = list(PAY_SHORT_CCMOC = JOB_PLAYTIME_TIER_0)
 	uses_special_name = TRUE
 	flags = EQUIPMENT_PRESET_EXTRA
 	skills = /datum/skills/everything
 	assignment = "Huntsman"
-	rank = "Huntsman"
+	job_title = "Huntsman"
 	idtype = /obj/item/card/id/gold
 
 /datum/equipment_preset/fun/van_bandolier/New()
@@ -363,7 +369,7 @@
 	new_human.b_facial = 51
 	new_human.h_style = "Mullet"
 	new_human.f_style = "Full English"
-	new_human.skin_color = "pale2"
+	new_human.skin_color = SKIN_COLOR_PALE2
 	new_human.r_eyes = 102 //Brown eyes.
 	new_human.g_eyes = 51
 	new_human.b_eyes = 0
@@ -421,27 +427,27 @@
 	skills = /datum/skills/pfc/crafty // about equivalent to a marine
 
 	assignment = "Monkey"
-	rank = "Monkey"
+	job_title = "Monkey"
 	idtype = /obj/item/card/id/dogtag
 
 /datum/equipment_preset/fun/monkey/load_race(mob/living/carbon/human/new_human, client/mob_client)
 	new_human.set_species(SPECIES_MONKEY)
 
 /datum/equipment_preset/fun/monkey/load_name(mob/living/carbon/human/new_human, randomise, client/mob_client)
-	new_human.gender = pick(60;MALE,40;FEMALE)
+	new_human.gender = pick(MALE, FEMALE)
 	var/random_name = get_random_name(new_human)
 	new_human.change_real_name(new_human, random_name)
 	new_human.age = rand(1, 40)
 
 /datum/equipment_preset/fun/monkey/proc/get_random_name(mob/living/carbon/human/new_human)
-	return pick(GLOB.monkey_names)
+	return capitalize(pick(GLOB.monkey_names))
 
 /datum/equipment_preset/fun/monkey/marine
 	name = "Fun - Monkey Marine"
 
 	assignment = "Monkey Marine"
-	rank = "Monkey Marine"
-	paygrade = PAY_SHORT_ME2
+	job_title = "Monkey Marine"
+	paygrades = list(PAY_SHORT_ME2 = JOB_PLAYTIME_TIER_0)
 
 /datum/equipment_preset/fun/monkey/marine/load_gear(mob/living/carbon/human/new_human)
 	new_human.equip_to_slot_or_del(new /obj/item/clothing/under/marine(new_human), WEAR_BODY)
@@ -457,8 +463,8 @@
 	name = "Fun - Monkey Soldier"
 
 	assignment = "Monkey Soldier"
-	rank = "Monkey Soldier"
-	paygrade = PAY_SHORT_UE1
+	job_title = "Monkey Soldier"
+	paygrades = list(PAY_SHORT_UE1 = JOB_PLAYTIME_TIER_0)
 
 /datum/equipment_preset/fun/monkey/soldier/get_random_name(mob/living/carbon/human/new_human)
 	return new_human.gender == MALE ? pick(GLOB.first_names_male_upp) : pick(GLOB.first_names_female_upp)

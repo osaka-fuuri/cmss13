@@ -231,6 +231,9 @@
  */
 /datum/tgui_window/proc/close(can_be_suspended = TRUE)
 	if(!client)
+		release_lock()
+		status = TGUI_WINDOW_CLOSED
+		message_queue = null
 		return
 	if(mouse_event_macro_set)
 		remove_mouse_macro()
@@ -384,6 +387,8 @@
 			client << link(href_list["url"])
 		if("cacheReloaded")
 			reinitialize()
+		if("chat/resend")
+			SSchat.handle_resend(client, payload)
 
 /*
 /datum/tgui_window/vv_edit_var(var_name, var_value)

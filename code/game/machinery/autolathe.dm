@@ -2,11 +2,17 @@
 #define AUTOLATHE_WIRE_SHOCK 2
 #define AUTOLATHE_WIRES_UNCUT (AUTOLATHE_WIRE_HACK|AUTOLATHE_WIRE_SHOCK) // when none of the wires are cut
 
+GLOBAL_LIST_INIT(autolathe_wire_descriptions, flatten_numeric_alist(alist(
+		AUTOLATHE_WIRE_HACK = "Item template controller",
+		AUTOLATHE_WIRE_SHOCK = "Ground safety",
+	)))
+
 /obj/structure/machinery/autolathe
 	name = "\improper autolathe"
 	desc = "It produces items using metal and glass."
 	icon_state = "autolathe"
 	var/base_state = "autolathe"
+	icon = 'icons/obj/structures/machinery/autolathe.dmi'
 	unacidable = TRUE
 	density = TRUE
 	anchored = TRUE
@@ -35,6 +41,8 @@
 	var/busy = FALSE
 	var/turf/make_loc
 
+	var/spawn_full = FALSE
+
 	var/wires = AUTOLATHE_WIRES_UNCUT
 
 	/// theme for tgui
@@ -53,11 +61,6 @@
 
 /obj/structure/machinery/autolathe/Initialize(mapload, ...)
 	. = ..()
-	projected_stored_material = stored_material.Copy()
-	if(!mapload)
-		for(var/res as anything in projected_stored_material)
-			projected_stored_material[res] = 0
-			stored_material[res] = 0
 
 	//Create global autolathe recipe list if it hasn't been made already.
 	if(isnull(recipes))
@@ -85,6 +88,16 @@
 	for(var/component in components)
 		LAZYADD(component_parts, new component(src))
 	RefreshParts()
+
+	if(spawn_full)
+		for(var/material in stored_material)
+			stored_material[material] = storage_capacity[material]
+	projected_stored_material = stored_material.Copy()
+	if(!mapload && !spawn_full)
+		for(var/res as anything in projected_stored_material)
+			projected_stored_material[res] = 0
+			stored_material[res] = 0
+
 	update_printables()
 
 // --- TGUI GOES HERE --- \\
@@ -93,14 +106,14 @@
 	if(..())
 		return
 	if(shocked)
-		shock(user, 50)
-		return
+		if(shock(user, 50))
+			return
 	tgui_interact(user)
 
 /obj/structure/machinery/autolathe/tgui_interact(mob/user, datum/tgui/ui)
 	ui = SStgui.try_update_ui(user, src, ui)
 	if(!ui)
-		ui = new(user, src, "Autolathe", "[name] control panel")
+		ui = new(user, src, "Autolathe", "[capitalize(name)] control panel")
 		ui.open()
 
 /obj/structure/machinery/autolathe/ui_data(mob/user)
@@ -127,10 +140,9 @@
 	data["materials"] = stored_material
 	data["printables"] = printables
 
-	var/list/wire_descriptions = get_wire_descriptions()
 	var/list/panel_wires = list()
-	for(var/wire = 1 to length(wire_descriptions))
-		panel_wires += list(list("desc" = wire_descriptions[wire], "cut" = isWireCut(wire)))
+	for(var/wire in 1 to length(GLOB.autolathe_wire_descriptions))
+		panel_wires += list(list("desc" = GLOB.autolathe_wire_descriptions[wire], "cut" = isWireCut(wire)))
 
 	data["electrical"] = list(
 		"electrified" = shocked,
@@ -224,7 +236,7 @@
 		if("cutwire")
 			if(!panel_open)
 				return FALSE
-			if(!skillcheck(usr, SKILL_ENGINEER, SKILL_ENGINEER_ENGI))
+			if(!skillcheck(usr, SKILL_ENGINEER, SKILL_ENGINEER_TRAINED))
 				to_chat(usr, SPAN_WARNING("You don't understand anything about this wiring..."))
 				return FALSE
 			var/obj/item/held_item = usr.get_held_item()
@@ -233,12 +245,12 @@
 				return TRUE
 
 			var/wire = params["wire"]
-			cut(wire)
+			cut(wire, ui.user)
 			return TRUE
 		if("fixwire")
 			if(!panel_open)
 				return FALSE
-			if(!skillcheck(usr, SKILL_ENGINEER, SKILL_ENGINEER_ENGI))
+			if(!skillcheck(usr, SKILL_ENGINEER, SKILL_ENGINEER_TRAINED))
 				to_chat(usr, SPAN_WARNING("You don't understand anything about this wiring..."))
 				return FALSE
 			var/obj/item/held_item = usr.get_held_item()
@@ -246,12 +258,12 @@
 				to_chat(usr, SPAN_WARNING("You need wirecutters!"))
 				return TRUE
 			var/wire = params["wire"]
-			mend(wire)
+			mend(wire, ui.user)
 			return TRUE
 		if("pulsewire")
 			if(!panel_open)
 				return FALSE
-			if(!skillcheck(usr, SKILL_ENGINEER, SKILL_ENGINEER_ENGI))
+			if(!skillcheck(usr, SKILL_ENGINEER, SKILL_ENGINEER_TRAINED))
 				to_chat(usr, SPAN_WARNING("You don't understand anything about this wiring..."))
 				return FALSE
 			var/obj/item/held_item = usr.get_held_item()
@@ -262,14 +274,14 @@
 			if (isWireCut(wire))
 				to_chat(usr, SPAN_WARNING("You can't pulse a cut wire."))
 				return TRUE
-			pulse(wire)
+			pulse(wire, ui.user)
 			return TRUE
 
 // --- END TGUI --- \\
 
 /obj/structure/machinery/autolathe/attackby(obj/item/O as obj, mob/user as mob)
 	if(HAS_TRAIT(O, TRAIT_TOOL_SCREWDRIVER))
-		if(!skillcheck(user, SKILL_ENGINEER, SKILL_ENGINEER_ENGI))
+		if(!skillcheck(user, SKILL_ENGINEER, SKILL_ENGINEER_TRAINED))
 			to_chat(user, SPAN_WARNING("You are not trained to dismantle machines..."))
 			return
 		panel_open = !panel_open
@@ -445,12 +457,6 @@
 		var/obj/item/stack/S = I
 		S.amount = multiplier
 
-/obj/structure/machinery/autolathe/proc/get_wire_descriptions()
-	return list(
-		AUTOLATHE_WIRE_HACK = "Item template controller",
-		AUTOLATHE_WIRE_SHOCK = "Ground safety"
-	)
-
 /obj/structure/machinery/autolathe/proc/isWireCut(wire)
 	return !(wires & getWireFlag(wire))
 
@@ -559,8 +565,11 @@
 
 		printables += list(print_data)
 
-/obj/structure/machinery/autolathe/full
+/obj/structure/machinery/autolathe/partial
 	stored_material =  list("metal" = 40000, "glass" = 20000)
+
+/obj/structure/machinery/autolathe/full
+	spawn_full = TRUE
 
 /obj/structure/machinery/autolathe/armylathe
 	name = "\improper Armylathe"
@@ -582,11 +591,14 @@
 		/obj/item/stock_parts/console_screen,
 	)
 
-/obj/structure/machinery/autolathe/armylathe/full
+/obj/structure/machinery/autolathe/armylathe/partial
 	stored_material =  list("metal" = 56250, "plastic" = 20000) //15 metal and 10 plastic sheets
 
+/obj/structure/machinery/autolathe/armylathe/full
+	spawn_full = TRUE
+
 /obj/structure/machinery/autolathe/armylathe/attack_hand(mob/user)
-	if(!skillcheck(user, SKILL_ENGINEER, SKILL_ENGINEER_ENGI))
+	if(!(user.job in list(JOB_ORDNANCE_TECH,JOB_WO_ORDNANCE_TECH)))
 		to_chat(user, SPAN_WARNING("You have no idea how to operate the [name]."))
 		return FALSE
 	. = ..()
@@ -609,8 +621,11 @@
 	make_loc = TRUE
 	tgui_theme = "weyland"
 
-/obj/structure/machinery/autolathe/medilathe/full
+/obj/structure/machinery/autolathe/medilathe/partial
 	stored_material =  list("glass" = 20000, "plastic" = 40000) //20 plastic and 10 glass sheets
+
+/obj/structure/machinery/autolathe/medilathe/full
+	spawn_full = TRUE
 
 /obj/structure/machinery/autolathe/medilathe/attack_hand(mob/user)
 	if(!skillcheck(user, SKILL_MEDICAL, SKILL_MEDICAL_DOCTOR))

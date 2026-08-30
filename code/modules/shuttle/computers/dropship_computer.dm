@@ -3,9 +3,9 @@
 	desc = "A flight computer that can be used for autopilot or long-range flights."
 	icon = 'icons/obj/structures/machinery/shuttle-parts.dmi'
 	icon_state = "console"
-	req_one_access = list(ACCESS_MARINE_LEADER, ACCESS_MARINE_DROPSHIP)
+	req_one_access = list(ACCESS_MARINE_LEADER, ACCESS_MARINE_DROPSHIP, ACCESS_MARINE_SENIOR)
 	unacidable = TRUE
-	exproof = TRUE
+	explo_proof = TRUE
 	needs_power = FALSE
 	var/override_being_removed = FALSE
 
@@ -28,6 +28,18 @@
 	// linked lz id (lz1, lz2 or null)
 	var/linked_lz
 
+	var/can_change_shuttle = FALSE
+	var/faction = FACTION_MARINE
+
+	/// If this computer should respect the faction variable of destination LZ
+	var/use_factions = TRUE
+	COOLDOWN_DECLARE(dropship_alarm)
+
+/obj/structure/machinery/computer/shuttle/dropship/flight/upp
+	icon_state = "console_upp"
+	req_one_access = list(ACCESS_UPP_FLIGHT)
+	faction = FACTION_UPP
+
 /obj/structure/machinery/computer/shuttle/dropship/flight/Initialize(mapload, ...)
 	. = ..()
 	compatible_landing_zones = get_landing_zones()
@@ -39,6 +51,8 @@
 /obj/structure/machinery/computer/shuttle/dropship/flight/proc/get_landing_zones()
 	. = list()
 	for(var/obj/docking_port/stationary/marine_dropship/dock in SSshuttle.stationary)
+		if(use_factions && dock.faction != faction)
+			continue
 		if(istype(dock, /obj/docking_port/stationary/marine_dropship/crash_site))
 			continue
 		. += list(dock)
@@ -90,8 +104,11 @@
 /obj/structure/machinery/computer/shuttle/dropship/flight/tgui_interact(mob/user, datum/tgui/ui)
 	ui = SStgui.try_update_ui(user, src, ui)
 	if (!ui)
-		var/obj/docking_port/mobile/shuttle = SSshuttle.getShuttle(shuttleId)
-		ui = new(user, src, "DropshipFlightControl", "[shuttle.name] Flight Computer")
+		var/obj/docking_port/mobile/shuttle = SSshuttle.getShuttle(shuttleId, warn=!can_change_shuttle)
+		var/name = capitalize(shuttle?.name)
+		if(can_change_shuttle)
+			name = "Remote"
+		ui = new(user, src, "DropshipFlightControl", "[name] Flight Computer")
 		ui.open()
 
 /obj/structure/machinery/computer/shuttle/dropship/flight/ui_status(mob/user, datum/ui_state/state)
@@ -111,23 +128,54 @@
 			units = "minutes"
 		to_chat(user, SPAN_WARNING("The shuttle is not responding, try again in [remaining_time] [units]."))
 		return UI_CLOSE
+	if(!ignore_ftl_or_crash && (SShijack.in_ftl || SShijack.hijack_status >= HIJACK_OBJECTIVES_GROUND_CRASH))
+		var/turf/our_location = get_turf(src)
+		var/obj/docking_port/mobile/marine_dropship/shuttle = SSshuttle.getShuttle(shuttleId, warn=!can_change_shuttle)
+		if(!shuttle)
+			if(is_mainship_level(our_location.z))
+				to_chat(user, SPAN_WARNING("Launch location unknown. Autopilot requires recalibration. Please seek an authorized service technician."))
+				return UI_CLOSE
+			return .
+		var/turf/shuttle_location = get_turf(shuttle)
+		if(is_mainship_level(shuttle_location.z) || (shuttle_location.z != our_location.z && is_mainship_level(our_location.z)))
+			to_chat(user, SPAN_WARNING("Launch location unknown. Autopilot requires recalibration. Please seek an authorized service technician."))
+			if(can_change_shuttle)
+				shuttleId = null
+				update_static_data(user)
+				return .
+			return UI_CLOSE
 
 /obj/structure/machinery/computer/shuttle/dropship/flight/ui_state(mob/user)
-	var/obj/docking_port/mobile/marine_dropship/shuttle = SSshuttle.getShuttle(shuttleId)
-	if(shuttle.is_hijacked)
+	var/obj/docking_port/mobile/marine_dropship/shuttle = SSshuttle.getShuttle(shuttleId, warn=!can_change_shuttle)
+	if(shuttle?.is_hijacked)
 		return GLOB.never_state
 	return GLOB.not_incapacitated_and_adjacent_strict_state
 
 /obj/structure/machinery/computer/shuttle/dropship/flight/ui_static_data(mob/user)
 	. = ..(user)
 	compatible_landing_zones = get_landing_zones()
-	var/obj/docking_port/mobile/shuttle = SSshuttle.getShuttle(shuttleId)
+	var/obj/docking_port/mobile/shuttle = SSshuttle.getShuttle(shuttleId, warn=!can_change_shuttle)
 	// we convert the time to seconds for rendering to ui
-	.["max_flight_duration"] = shuttle.callTime / 10
-	.["max_pre_arrival_duration"] = shuttle.prearrivalTime / 10
-	.["max_refuel_duration"] = shuttle.rechargeTime / 10
-	.["max_engine_start_duration"] = shuttle.ignitionTime / 10
-	.["door_data"] = list("port", "starboard", "aft")
+	if(shuttle)
+		.["max_flight_duration"] = shuttle.callTime / 10
+		.["max_pre_arrival_duration"] = shuttle.prearrivalTime / 10
+		.["max_refuel_duration"] = shuttle.rechargeTime / 10
+		.["max_engine_start_duration"] = shuttle.ignitionTime / 10
+		.["door_data"] = list("port", "starboard", "aft")
+	.["alternative_shuttles"] = list()
+	if(can_change_shuttle)
+		.["alternative_shuttles"] = alternative_shuttles()
+
+/obj/structure/machinery/computer/shuttle/dropship/flight/proc/alternative_shuttles()
+	. = list()
+	for(var/obj/docking_port/mobile/marine_dropship/shuttle in SSshuttle.mobile)
+		if(use_factions && shuttle.faction != faction)
+			continue
+		. += list(
+			list(
+				"id" = shuttle.id, "name" = shuttle)
+		)
+
 
 /obj/structure/machinery/computer/shuttle/dropship/flight/attack_hand(mob/user)
 	. = ..(user)
@@ -139,7 +187,11 @@
 		return TRUE
 
 	// if the dropship has crashed don't allow more interactions
-	var/obj/docking_port/mobile/marine_dropship/shuttle = SSshuttle.getShuttle(shuttleId)
+	var/obj/docking_port/mobile/marine_dropship/shuttle = SSshuttle.getShuttle(shuttleId, warn=!can_change_shuttle)
+	if(!shuttle)
+		tgui_interact(user)
+		return
+
 	if(shuttle.mode == SHUTTLE_CRASHED)
 		to_chat(user, SPAN_NOTICE("[src] is unresponsive."))
 		return
@@ -188,6 +240,23 @@
 
 	var/obj/docking_port/mobile/shuttle = SSshuttle.getShuttle(shuttleId)
 	if(linked_lz)
+		var/obj/docking_port/stationary/landing_zone = SSshuttle.getDock(linked_lz)
+		var/obj/docking_port/mobile/maybe_dropship = landing_zone.get_docked()
+
+		if(maybe_dropship)
+			to_chat(xeno, SPAN_NOTICE("A metal bird already is here."))
+			return
+
+		var/conflicting_transit = FALSE
+		for(var/obj/docking_port/mobile/other_shuttle in SSshuttle.mobile)
+			if(landing_zone == other_shuttle.destination)
+				conflicting_transit = TRUE
+				break
+
+		if(conflicting_transit)
+			to_chat(xeno, SPAN_NOTICE("A metal bird is already coming."))
+			return
+
 		playsound(loc, 'sound/machines/terminal_success.ogg', KEYBOARD_SOUND_VOLUME, 1)
 		if(shuttle.mode == SHUTTLE_IDLE && !is_ground_level(shuttle.z))
 			var/result = SSshuttle.moveShuttle(shuttleId, linked_lz, TRUE)
@@ -195,12 +264,12 @@
 				to_chat(xeno, SPAN_WARNING("The metal bird can not land here. It might be currently occupied!"))
 				return
 			to_chat(xeno, SPAN_NOTICE("You command the metal bird to come down. Clever girl."))
-			xeno_announcement(SPAN_XENOANNOUNCE("Our Queen has commanded the metal bird to the hive at [linked_lz]."), xeno.hivenumber, XENO_GENERAL_ANNOUNCE)
+			xeno_announcement(SPAN_XENOANNOUNCE("Our Queen has commanded the metal bird to the hive at [landing_zone.name]."),xeno.hivenumber,XENO_GENERAL_ANNOUNCE)
 			log_ares_flight("Unknown", "Remote launch signal for [shuttle.name] received. Authentication garbled.")
 			log_ares_security("Security Alert", "Remote launch signal for [shuttle.name] received. Authentication garbled.")
 			return
-		if(shuttle.destination.id != linked_lz)
-			to_chat(xeno, "The shuttle not ready. The screen reads T-[shuttle.timeLeft(10)]. Have patience.")
+		if(shuttle.destination && shuttle.destination.id != linked_lz)
+			to_chat(xeno, "The shuttle is not ready. The screen reads T-[shuttle.timeLeft(10)]. Have patience.")
 			return
 		if(shuttle.mode == SHUTTLE_CALL)
 			to_chat(xeno, "The shuttle is in flight. The screen reads T-[shuttle.timeLeft(10)]. Have patience.")
@@ -214,6 +283,11 @@
 
 
 /obj/structure/machinery/computer/shuttle/dropship/flight/attack_alien(mob/living/carbon/xenomorph/xeno)
+	// if the shuttleid is null or the shuttleid references a shuttle that has been removed from play, pick one
+	if(!shuttleId || !SSshuttle.getShuttle(shuttleId, FALSE))
+		var/list/alternatives = alternative_shuttles()
+		shuttleId = pick(alternatives)["id"]
+
 	var/obj/docking_port/mobile/marine_dropship/dropship = SSshuttle.getShuttle(shuttleId)
 
 	// If the attacking xeno isn't the queen.
@@ -243,21 +317,23 @@
 		return
 
 	// door controls being overridden
-	if(!dropship_control_lost)
+	if(!dropship_control_lost && do_after(xeno, 3 SECONDS, INTERRUPT_ALL, BUSY_ICON_HOSTILE))
 		dropship.control_doors("unlock", "all", TRUE)
 		dropship_control_lost = TRUE
+		update_icon()
 		door_control_cooldown = addtimer(CALLBACK(src, PROC_REF(remove_door_lock)), SHUTTLE_LOCK_COOLDOWN, TIMER_STOPPABLE|TIMER_UNIQUE|TIMER_OVERRIDE|TIMER_NO_HASH_WAIT)
 		if(GLOB.almayer_orbital_cannon)
 			GLOB.almayer_orbital_cannon.is_disabled = TRUE
 			addtimer(CALLBACK(GLOB.almayer_orbital_cannon, TYPE_PROC_REF(/obj/structure/orbital_cannon, enable)), 10 MINUTES, TIMER_UNIQUE)
-		if(!GLOB.resin_lz_allowed)
-			set_lz_resin_allowed(TRUE)
+		if(!MODE_HAS_MODIFIER(/datum/gamemode_modifier/lz_weeding))
+			MODE_SET_MODIFIER(/datum/gamemode_modifier/lz_weeding, TRUE)
 		stop_playing_launch_announcement_alarm()
 
 		to_chat(xeno, SPAN_XENONOTICE("You override the doors."))
 		xeno_message(SPAN_XENOANNOUNCE("The doors of the metal bird have been overridden! Rejoice!"), 3, xeno.hivenumber)
 		message_admins("[key_name(xeno)] has locked the dropship '[dropship]'", xeno.x, xeno.y, xeno.z)
 		notify_ghosts(header = "Dropship Locked", message = "[xeno] has locked [dropship]!", source = xeno, action = NOTIFY_ORBIT)
+		SScmtv.spectate_event("Dropship Locked", src)
 		return
 
 	if(dropship_control_lost)
@@ -277,11 +353,22 @@
 		hijack(xeno)
 		return
 
+/obj/structure/machinery/computer/shuttle/dropship/flight/handle_tail_stab(mob/living/carbon/xenomorph/xeno, blunt_stab)
+	return TAILSTAB_COOLDOWN_NONE
+
+/obj/structure/machinery/computer/shuttle/dropship/flight/update_icon()
+	. = ..()
+	if(icon_state == "console") // someday, replace this with a better check
+		if(dropship_control_lost)
+			icon_state = "[initial(icon_state)]-locked"
+		else
+			icon_state = initial(icon_state)
+
 /obj/structure/machinery/computer/shuttle/dropship/flight/proc/hijack(mob/user, force = FALSE)
 	// select crash location
 	var/turf/source_turf = get_turf(src)
 	var/obj/docking_port/mobile/marine_dropship/dropship = SSshuttle.getShuttle(shuttleId)
-	var/result = tgui_input_list(user, "Where to 'land'?", "Dropship Hijack", GLOB.almayer_ship_sections , timeout = 10 SECONDS)
+	var/result = tgui_input_list(user, "Where to 'land'?", "Dropship Hijack", GLOB.almayer_ship_sections, timeout = 10 SECONDS)
 	if(!result)
 		return
 	if(!user.Adjacent(source_turf) && !force)
@@ -292,16 +379,19 @@
 	var/datum/dropship_hijack/almayer/hijack = new()
 	dropship.hijack = hijack
 	hijack.shuttle = dropship
+	SShijack.on_call_shuttle()
 	hijack.target_crash_site(result)
 
 	dropship.crashing = TRUE
 	dropship.is_hijacked = TRUE
 
 	hijack.fire()
-	GLOB.alt_ctrl_disabled = TRUE
 
-	marine_announcement("Unscheduled dropship departure detected from operational area. Hijack likely. Shutting down autopilot.", "Dropship Alert", 'sound/AI/hijack.ogg', logging = ARES_LOG_SECURITY)
-	log_ares_flight("Unknown", "Unscheduled dropship departure detected from operational area. Hijack likely. Shutting down autopilot.")
+	var/ares_message = "Unscheduled dropship departure detected from operational area. Hijack likely. Shutting down autopilot."
+	marine_announcement(ares_message, "Dropship Alert", 'sound/AI/hijack.ogg', logging = ARES_LOG_SECURITY)
+	log_ares_flight("Unknown", ares_message)
+	playsound(src, 'sound/misc/queen_alarm.ogg')
+	addtimer(CALLBACK(SShijack, TYPE_PROC_REF(/datum/controller/subsystem/hijack, hijack_general_quarters)), 10 SECONDS)
 
 	var/mob/living/carbon/xenomorph/xeno = user
 	var/hivenumber = XENO_HIVE_NORMAL
@@ -310,21 +400,11 @@
 	xeno_message(SPAN_XENOANNOUNCE("The Queen has commanded the metal bird to depart for the metal hive in the sky! Rejoice!"), 3, hivenumber)
 	xeno_message(SPAN_XENOANNOUNCE("The hive swells with power! You will now steadily gain pooled larva over time."), 2, hivenumber)
 	var/datum/hive_status/hive = GLOB.hive_datum[hivenumber]
-	hive.abandon_on_hijack()
-	var/original_evilution = hive.evolution_bonus
-	hive.override_evilution(XENO_HIJACK_EVILUTION_BUFF, TRUE)
-	if(hive.living_xeno_queen)
-		var/datum/action/xeno_action/onclick/grow_ovipositor/ovi_ability = get_action(hive.living_xeno_queen, /datum/action/xeno_action/onclick/grow_ovipositor)
-		ovi_ability.reduce_cooldown(ovi_ability.xeno_cooldown)
-	addtimer(CALLBACK(hive, TYPE_PROC_REF(/datum/hive_status, override_evilution), original_evilution, FALSE), XENO_HIJACK_EVILUTION_TIME)
+	hive.bless_on_hijack()
+	addtimer(CALLBACK(hive, TYPE_PROC_REF(/datum/hive_status, abandon_on_hijack)), DROPSHIP_WARMUP_TIME, TIMER_UNIQUE)
 
 	// Notify the yautja too so they stop the hunt
-	message_all_yautja("The serpent Queen has commanded the landing shuttle to depart.")
-	playsound(src, 'sound/misc/queen_alarm.ogg')
-
-	if(istype(SSticker.mode, /datum/game_mode/colonialmarines))
-		var/datum/game_mode/colonialmarines/colonial_marines = SSticker.mode
-		colonial_marines.add_current_round_status_to_end_results("Hijack")
+	elder_overseer_message("The serpent Queen has commanded the landing shuttle to depart.")
 
 /obj/structure/machinery/computer/shuttle/dropship/flight/proc/remove_door_lock()
 	if(door_control_cooldown)
@@ -335,41 +415,46 @@
 		return
 	playsound(loc, 'sound/machines/terminal_success.ogg', KEYBOARD_SOUND_VOLUME, 1)
 	dropship_control_lost = FALSE
+	update_icon()
 
 /obj/structure/machinery/computer/shuttle/dropship/flight/ui_data(mob/user)
-	var/obj/docking_port/mobile/marine_dropship/shuttle = SSshuttle.getShuttle(shuttleId)
+	var/obj/docking_port/mobile/marine_dropship/shuttle = SSshuttle.getShuttle(shuttleId, warn=!can_change_shuttle)
 	. = list()
-	.["shuttle_mode"] = shuttle.mode
-	.["flight_time"] = shuttle.timeLeft(0)
-	.["is_disabled"] = disabled || shuttle.is_hijacked
+	.["shuttle_id"] = shuttle?.id
+	.["shuttle_mode"] = shuttle?.mode
+	.["flight_time"] = shuttle?.timeLeft(0)
+	.["is_disabled"] = disabled
+	if(shuttle?.is_hijacked)
+		.["is_disabled"] = TRUE
 	.["locked_down"] = FALSE
 	.["can_fly_by"] = !is_remote
 	.["can_set_automated"] = is_remote
 	.["automated_control"] = list(
-		"is_automated" = shuttle.automated_hangar_id != null || shuttle.automated_lz_id != null,
-		"hangar_lz" = shuttle.automated_hangar_id,
-		"ground_lz" = shuttle.automated_lz_id
+		"is_automated" = shuttle?.automated_hangar_id != null || shuttle?.automated_lz_id != null,
+		"hangar_lz" = shuttle?.automated_hangar_id,
+		"ground_lz" = shuttle?.automated_lz_id
 	)
 	.["primary_lz"] = SSticker.mode.active_lz?.linked_lz
-	if(shuttle.destination)
-		.["target_destination"] = shuttle.in_flyby? "Flyby" : shuttle.destination.name
+	if(shuttle?.destination)
+		.["target_destination"] = shuttle?.in_flyby? "Flyby" : shuttle?.destination.name
 
-	.["door_status"] = is_remote ? list() : shuttle.get_door_data()
+	.["door_status"] = is_remote ? list() : shuttle?.get_door_data()
 	.["has_flyby_skill"] = skillcheck(user, SKILL_PILOT, SKILL_PILOT_EXPERT)
 
 	// Launch Alarm Variables
-	.["playing_launch_announcement_alarm"] = shuttle.playing_launch_announcement_alarm
+	.["playing_launch_announcement_alarm"] = shuttle?.playing_launch_announcement_alarm
 
 	.["destinations"] = list()
 	// add flight
-	.["destinations"] += list(
-		list(
-			"id" = DROPSHIP_FLYBY_ID,
-			"name" = "Flyby",
-			"available" = TRUE,
-			"error" = FALSE
+	if(!is_remote)
+		.["destinations"] += list(
+			list(
+				"id" = DROPSHIP_FLYBY_ID,
+				"name" = "Flyby",
+				"available" = TRUE,
+				"error" = FALSE
+			)
 		)
-	)
 
 	for(var/obj/docking_port/stationary/dock in compatible_landing_zones)
 		var/dock_reserved = FALSE
@@ -377,7 +462,7 @@
 			if(dock == other_shuttle.destination)
 				dock_reserved = TRUE
 				break
-		var/can_dock = shuttle.canDock(dock)
+		var/can_dock = shuttle?.canDock(dock)
 		var/list/dockinfo = list(
 			"id" = dock.id,
 			"name" = dock.name,
@@ -390,19 +475,29 @@
 	. = ..()
 	if(.)
 		return
-	var/obj/docking_port/mobile/marine_dropship/shuttle = SSshuttle.getShuttle(shuttleId)
-	if(disabled || shuttle.is_hijacked)
+	var/obj/docking_port/mobile/marine_dropship/shuttle = SSshuttle.getShuttle(shuttleId, warn=!can_change_shuttle)
+	if(disabled || (shuttle && shuttle.is_hijacked))
+		switch(action)
+			if ("change_shuttle")
+				var/new_shuttle = params["new_shuttle"]
+				return set_shuttle(new_shuttle)
 		return
-	var/mob/user = usr
-	var/obj/structure/machinery/computer/shuttle/dropship/flight/comp = shuttle.getControlConsole()
-	if(comp.dropship_control_lost)
-		to_chat(user, SPAN_WARNING("The dropship isn't responding to controls."))
-		return
+	var/mob/user = ui.user
+	if (shuttle)
+		var/obj/structure/machinery/computer/shuttle/dropship/flight/comp = shuttle.getControlConsole()
+		if(comp.dropship_control_lost)
+			to_chat(user, SPAN_WARNING("The dropship isn't responding to controls."))
+			return
+
+	if(use_factions && shuttle && shuttle.faction != faction) //someone trying href
+		return FALSE
 
 	switch(action)
 		if("move")
+			if(!shuttle)
+				return FALSE
 			if(shuttle.mode != SHUTTLE_IDLE && (shuttle.mode != SHUTTLE_CALL && !shuttle.destination))
-				to_chat(usr, SPAN_WARNING("You can't move to a new destination right now."))
+				to_chat(user, SPAN_WARNING("You can't move to a new destination right now."))
 				return TRUE
 
 			var/is_optimised = FALSE
@@ -417,7 +512,8 @@
 					return FALSE
 				update_equipment(is_optimised, TRUE)
 				to_chat(user, SPAN_NOTICE("You begin the launch sequence for a flyby."))
-				log_ares_flight(user.name, "Launched Dropship [shuttle.name] on a flyby.")
+				if(shuttle.faction == FACTION_MARINE)
+					log_ares_flight(user.name, "Launched Dropship [shuttle.name] on a flyby.")
 				var/log = "[key_name(user)] launched the dropship [src.shuttleId] on flyby."
 				msg_admin_niche(log)
 				log_interact(user, msg = "[log]")
@@ -448,7 +544,8 @@
 				return TRUE
 			SSshuttle.moveShuttle(shuttle.id, dock.id, TRUE)
 			to_chat(user, SPAN_NOTICE("You begin the launch sequence to [dock]."))
-			log_ares_flight(user.name, "Launched Dropship [shuttle.name] on a flight to [dock].")
+			if(shuttle.faction == FACTION_MARINE)
+				log_ares_flight(user.name, "Launched Dropship [shuttle.name] on a flight to [dock].")
 			var/log = "[key_name(user)] launched the dropship [src.shuttleId] on transport."
 			msg_admin_niche(log)
 			log_interact(user, msg = "[log]")
@@ -458,6 +555,8 @@
 			playsound(loc, get_sfx("terminal_button"), KEYBOARD_SOUND_VOLUME, 1)
 			return FALSE
 		if("door-control")
+			if(!shuttle)
+				return FALSE
 			if(shuttle.mode == SHUTTLE_CALL || shuttle.mode == SHUTTLE_RECALL)
 				return TRUE
 			var/interaction = params["interaction"]
@@ -468,6 +567,8 @@
 				playsound(loc, 'sound/machines/terminal_error.ogg', KEYBOARD_SOUND_VOLUME, 1)
 				to_chat(user, SPAN_WARNING("Door controls have been overridden. Please call technical support."))
 		if("set-automate")
+			if(!shuttle)
+				return FALSE
 			var/almayer_lz = params["hangar_id"]
 			var/ground_lz = params["ground_id"]
 			var/delay = clamp(params["delay"] SECONDS, DROPSHIP_MIN_AUTO_DELAY, DROPSHIP_MAX_AUTO_DELAY)
@@ -481,47 +582,77 @@
 				to_chat(user, SPAN_WARNING("The dropships main controls are not accepting the order."))
 				playsound(loc, 'sound/machines/terminal_error.ogg', KEYBOARD_SOUND_VOLUME, 1)
 				return
+			if(SShijack.in_ftl || SShijack.hijack_status >= HIJACK_OBJECTIVES_GROUND_CRASH)
+				to_chat(user, SPAN_WARNING("The dropships main controls are not accepting the order."))
+				playsound(loc, 'sound/machines/terminal_error.ogg', KEYBOARD_SOUND_VOLUME, 1)
+				return
 
 			shuttle.automated_hangar_id = almayer_lz
 			shuttle.automated_lz_id = ground_lz
 			shuttle.automated_delay = delay
 			playsound(loc, get_sfx("terminal_button"), KEYBOARD_SOUND_VOLUME, 1)
-			log_ares_flight(user.name, "Enabled autopilot for Dropship [shuttle.name].")
+			if(shuttle.faction == FACTION_MARINE)
+				log_ares_flight(user.name, "Enabled autopilot for Dropship [shuttle.name].")
 			var/log = "[key_name(user)] has enabled auto pilot on '[shuttle.name]'"
 			message_admins(log)
 			log_interact(user, msg = "[log]")
 			return
-			/* TODO
-				if(!dropship.automated_launch) //If we're toggling it on...
-					var/auto_delay
-					auto_delay = tgui_input_number(usr, "Set the delay for automated departure after recharging (seconds)", "Automated Departure Settings", DROPSHIP_MIN_AUTO_DELAY/10, DROPSHIP_MAX_AUTO_DELAY/10, DROPSHIP_MIN_AUTO_DELAY/10)
-					dropship.automated_launch_delay = Clamp(auto_delay SECONDS, DROPSHIP_MIN_AUTO_DELAY, DROPSHIP_MAX_AUTO_DELAY)
-					dropship.set_automated_launch(!dropship.automated_launch)
-			*/
 		if("disable-automate")
+			if(!shuttle)
+				return FALSE
 			shuttle.automated_hangar_id = null
 			shuttle.automated_lz_id = null
 			shuttle.automated_delay = null
 			playsound(loc, get_sfx("terminal_button"), KEYBOARD_SOUND_VOLUME, 1)
-			log_ares_flight(user.name, "Disabled autopilot for Dropship [shuttle.name].")
+			if(shuttle.faction == FACTION_MARINE)
+				log_ares_flight(user.name, "Disabled autopilot for Dropship [shuttle.name].")
 			var/log = "[key_name(user)] has disabled auto pilot on '[shuttle.name]'"
 			message_admins(log)
 			log_interact(user, msg = "[log]")
 			return
 
 		if("cancel-flyby")
+			if(!shuttle)
+				return FALSE
 			if(shuttle.in_flyby && shuttle.timer && shuttle.timeLeft(1) >= DROPSHIP_WARMUP_TIME)
 				shuttle.setTimer(DROPSHIP_WARMUP_TIME)
 		if("play_launch_announcement_alarm")
+			if(!shuttle)
+				return FALSE
 			if (shuttle.mode != SHUTTLE_IDLE && shuttle.mode != SHUTTLE_RECHARGING)
-				to_chat(usr, SPAN_WARNING("The Launch Announcement Alarm is designed to tell people that you're going to take off soon."))
-				return
+				to_chat(user, SPAN_WARNING("The Launch Announcement Alarm is designed to tell people that you're going to take off soon."))
+				return TRUE
+			if(!(COOLDOWN_FINISHED(src, dropship_alarm)))
+				to_chat(user, SPAN_WARNING("The Launch Announcement Alarm can not be restarted yet."))
+				return TRUE
 			shuttle.alarm_sound_loop.start()
 			shuttle.playing_launch_announcement_alarm = TRUE
-			return
+			COOLDOWN_START(src, dropship_alarm, 6 SECONDS)
+			return TRUE
 		if ("stop_playing_launch_announcement_alarm")
+			if(!shuttle)
+				return FALSE
 			stop_playing_launch_announcement_alarm()
-			return
+			return TRUE
+		if ("change_shuttle")
+			var/new_shuttle = params["new_shuttle"]
+			return set_shuttle(new_shuttle)
+
+/obj/structure/machinery/computer/shuttle/dropship/flight/proc/set_shuttle(new_shuttle)
+	var/mob/user = usr
+	if(!new_shuttle || shuttleId == new_shuttle)
+		return FALSE
+	var/found = FALSE
+	var/list/alternatives = alternative_shuttles()
+	for(var/alt_shuttle in alternatives)
+		if(alt_shuttle["id"] == new_shuttle)
+			found = TRUE
+	if(found)
+		shuttleId = new_shuttle
+		update_static_data(user)
+	else
+		log_admin("Player [user] attempted to change shuttle illegally.")
+	return TRUE
 
 /obj/structure/machinery/computer/shuttle/dropship/flight/proc/stop_playing_launch_announcement_alarm()
 	var/obj/docking_port/mobile/marine_dropship/shuttle = SSshuttle.getShuttle(shuttleId)
@@ -534,18 +665,23 @@
 	icon = 'icons/obj/structures/machinery/computer.dmi'
 	icon_state = "shuttle"
 	linked_lz = DROPSHIP_LZ1
-	shuttleId = DROPSHIP_ALAMO
 	is_remote = TRUE
+	can_change_shuttle = TRUE
 
 /obj/structure/machinery/computer/shuttle/dropship/flight/lz2
 	icon = 'icons/obj/structures/machinery/computer.dmi'
 	icon_state = "shuttle"
 	linked_lz = DROPSHIP_LZ2
-	shuttleId = DROPSHIP_NORMANDY
 	is_remote = TRUE
+	can_change_shuttle = TRUE
 
 /obj/structure/machinery/computer/shuttle/dropship/flight/remote_control
 	icon = 'icons/obj/structures/machinery/computer.dmi'
 	icon_state = "shuttle"
 	is_remote = TRUE
 	needs_power = TRUE
+	can_change_shuttle = TRUE
+
+/obj/structure/machinery/computer/shuttle/dropship/flight/remote_control/upp
+	req_one_access = list(ACCESS_UPP_FLIGHT)
+	faction = FACTION_UPP

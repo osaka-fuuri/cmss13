@@ -3,6 +3,7 @@
 	layer = MOB_LAYER
 	animate_movement = 2
 	rebounds = TRUE
+	blocks_emissive = EMISSIVE_BLOCK_GENERIC
 	var/mob_flags = NO_FLAGS
 	var/datum/mind/mind
 
@@ -12,12 +13,12 @@
 	var/gid = 0
 
 	var/stat = 0 //Whether a mob is alive or dead. TODO: Move this to living - Nodrak
-	var/chatWarn = 0 //Tracks how many times someone has spammed and gives them a no-no timer
-
-	var/atom/movable/screen/hands = null //robot
 
 	/// a ckey that persists client logout / ghosting, replaced when a client inhabits the mob
 	var/persistent_ckey
+
+	/// the username() of the last mob that logged in
+	var/persistent_username
 
 	/*A bunch of this stuff really needs to go under their own defines instead of being globally attached to mob.
 	A variable should only be globally attached to turfs/obj/whatever, when it is in fact needed as such.
@@ -59,7 +60,7 @@
 	var/paralyzed = 0 //Carbon
 	var/druggy = 0 //Carbon
 	var/confused = 0 //Carbon
-	var/drowsyness = 0.0//Carbon
+	var/drowsiness = 0.0//Carbon
 	var/dizziness = 0//Carbon
 	var/jitteriness = 0//Carbon
 	var/floatiness = 0
@@ -90,6 +91,7 @@
 	var/mob_size = MOB_SIZE_HUMAN
 	var/list/embedded = list()   // Embedded items, since simple mobs don't have organs.
 	var/list/datum/language/languages = list()  // For speaking/listening.
+	var/list/language_flags = list()
 	var/list/speak_emote = list("says") // Verbs used when speaking. Defaults to 'say' if speak_emote is null.
 	var/emote_type = 1 // Define emote default type, 1 for seen emotes, 2 for heard emotes
 
@@ -113,6 +115,7 @@
 	var/life_kills_total = 0
 	var/life_damage_taken_total = 0
 	var/life_revives_total = 0
+	var/life_ib_total = 0
 	var/festivizer_hits_total = 0
 
 	var/life_value = 1 // when killed, the killee gets this much added to its life_kills_total
@@ -122,11 +125,8 @@
 	var/old_x = 0
 	var/old_y = 0
 
-	var/charges = 0
 	var/nutrition = NUTRITION_NORMAL//Carbon
 
-	var/overeatduration = 0 // How long this guy is overeating //Carbon
-	var/recovery_constant = 1
 	var/a_intent = INTENT_HELP//Living
 	var/m_intent = MOVE_INTENT_RUN
 	var/lastKnownIP = null
@@ -136,15 +136,13 @@
 	var/obj/item/back = null//Human/Monkey
 	var/obj/item/tank/internal = null//Human/Monkey
 	var/obj/item/storage/s_active = null//Carbon
-	var/obj/item/clothing/mask/wear_mask = null//Carbon
+	var/obj/item/wear_mask = null//Carbon
 
 	var/able_to_speak = TRUE
 
 	var/datum/hud/hud_used = null
 
 	var/grab_level = GRAB_PASSIVE //if we're pulling a mob, tells us how aggressive our grab is.
-
-	var/list/mapobjs = list()
 
 	var/throw_mode = THROW_MODE_OFF
 
@@ -193,12 +191,15 @@
 
 	var/recently_pointed_to = 0 //used as cooldown for the pointing verb.
 
+	var/recently_grabbed = 0 //used as a cooldown for item grabs
+
 	///Color matrices to be applied to the client window. Assoc. list.
 	var/list/client_color_matrices
 
-	var/list/image/hud_list //This mob's HUD (med/sec, etc) images. Associative list.
-
-	var/list/hud_possible //HUD images that this mob can provide.
+	///This mob's HUD (med/sec, etc) images. Associative list.
+	var/list/image/hud_list
+	///HUD images that this mob can provide.
+	var/list/hud_possible
 
 	var/action_busy //whether the mob is currently doing an action that takes time (do_after proc)
 	var/resisting // whether the mob is currently resisting (primarily for do_after proc)
@@ -224,7 +225,6 @@
 	can_block_movement = TRUE
 
 	appearance_flags = TILE_BOUND
-	var/mouse_icon = null
 
 	///the mob's tgui player panel
 	var/datum/player_panel/mob_panel
@@ -283,7 +283,7 @@
 /mob/vv_get_header()
 	. = ..()
 	var/refid = REF(src)
-	. += "<font size='1'><br><a href='?_src_=vars;[HrefToken()];view_combat_logs=[refid]'>View Combat Logs</a><br></font>"
+	. += "<font size='1'><br><a href='byond://?_src_=vars;[HrefToken()];view_combat_logs=[refid]'>View Combat Logs</a><br></font>"
 
 /mob/vv_do_topic(list/href_list)
 	. = ..()
@@ -326,7 +326,7 @@
 			return
 
 		if(!client || !client.admin_holder || !(client.admin_holder.rights & R_MOD))
-			to_chat(usr, "This can only be used on people with +MOD permissions")
+			to_chat(usr, "This can only be used on people with +MOD permissions.")
 			return
 
 		log_admin("[key_name(usr)] has toggled buildmode on [key_name(src)]")

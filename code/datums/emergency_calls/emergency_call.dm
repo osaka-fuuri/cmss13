@@ -18,7 +18,7 @@
 /datum/game_mode/proc/request_ert(user, ares = FALSE)
 	if(!user)
 		return FALSE
-	message_admins("[key_name(user)] has requested a Distress Beacon! [ares ? SPAN_ORANGE("(via ARES)") : ""] ([SSticker.mode.ert_dispatched ? SPAN_RED("A random ERT was dispatched previously.") : SPAN_GREEN("No previous random ERT dispatched.")]) [CC_MARK(user)] (<A HREF='?_src_=admin_holder;[HrefToken(forceGlobal = TRUE)];distress=\ref[user]'>SEND</A>) (<A HREF='?_src_=admin_holder;[HrefToken(forceGlobal = TRUE)];ccdeny=\ref[user]'>DENY</A>) [ADMIN_JMP_USER(user)] [CC_REPLY(user)]")
+	message_admins("[key_name(user)] has requested a Distress Beacon! [ares ? SPAN_ORANGE("(via ARES)") : ""] ([SSticker.mode.ert_dispatched ? SPAN_RED("A random ERT was dispatched previously.") : SPAN_GREEN("No previous random ERT dispatched.")]) [CC_MARK(user)] (<A href='byond://?_src_=admin_holder;[HrefToken(forceGlobal = TRUE)];distress=\ref[user]'>SEND</A>) (<A href='byond://?_src_=admin_holder;[HrefToken(forceGlobal = TRUE)];ccdeny=\ref[user]'>DENY</A>) [ADMIN_JMP_USER(user)] [CC_REPLY(user)]")
 	return TRUE
 
 //The distress call parent. Cannot be called itself due to "name" being a filtered target.
@@ -49,9 +49,17 @@
 	var/max_engineers = 1
 	var/max_heavies = 1
 	var/max_smartgunners = 1
+	//xeno roles
+	var/xeno_t3 = 0
+	var/xeno_t2 = 0
+	var/max_xeno_t3 = 1
+	var/max_xeno_t2 = 1
+
 	var/shuttle_id = MOBILE_SHUTTLE_ID_ERT1 //Empty shuttle ID means we're not using shuttles (aka spawn straight into cryo)
 	var/auto_shuttle_launch = TRUE
 	var/spawn_max_amount = FALSE
+	/// Whether this ERT can occur even during FTL or on a ground crash
+	var/ignore_ftl_or_crash = FALSE
 
 	var/ert_message = "An emergency beacon has been activated"
 
@@ -63,6 +71,9 @@
 	/// the [/datum/lazy_template] we should attempt to spawn in for the return journey
 	var/home_base = /datum/lazy_template/ert/freelancer_station
 
+	/// What sound plays to ghosts when this rolls? Silent if null
+	var/alert_sound
+
 /datum/game_mode/proc/initialize_emergency_calls()
 	if(length(all_calls)) //It's already been set up.
 		return
@@ -73,8 +84,10 @@
 		return FALSE
 	for(var/S in total_calls)
 		var/datum/emergency_call/C= new S()
-		if(!C) continue
-		if(C.name == "name") continue //The default parent, don't add it
+		if(!C)
+			continue
+		if(C.name == "name")
+			continue //The default parent, don't add it
 		all_calls += C
 
 //Randomizes and chooses a call datum.
@@ -124,10 +137,13 @@
 
 	for(var/mob/dead/observer/M in GLOB.observer_list)
 		if(M.client)
-			to_chat(M, SPAN_WARNING(FONT_SIZE_LARGE("\n[ert_message]. &gt; <a href='?src=\ref[M];joinresponseteam=1;'><b>Join Response Team</b></a> &lt; </span>")))
+			to_chat(M, SPAN_WARNING(FONT_SIZE_LARGE("\n[ert_message]. &gt; <a href='byond://?src=\ref[M];joinresponseteam=1;'><b>Join Response Team</b></a> &lt; </span>")))
 			to_chat(M, SPAN_WARNING(FONT_SIZE_LARGE("You cannot join if you have Ghosted recently. Click the link in chat, or use the verb in the ghost tab to join.</span>\n")))
 
 			give_action(M, /datum/action/join_ert, src)
+
+			if(!isnull(alert_sound))
+				playsound_client(M.client, alert_sound, vol = 50)
 
 /datum/game_mode/proc/activate_distress()
 	ert_dispatched = TRUE
@@ -224,11 +240,15 @@
 
 	addtimer(CALLBACK(src, TYPE_PROC_REF(/datum/emergency_call, spawn_candidates), quiet_launch, announce_incoming, override_spawn_loc), 30 SECONDS)
 
+/datum/emergency_call/proc/remove_nonqualifiers(list/datum/mind/candidates_list)
+	return candidates_list //everyone gets selected on 99% of distress beacons.
+
 /datum/emergency_call/proc/spawn_candidates(quiet_launch = FALSE, announce_incoming = TRUE, override_spawn_loc)
 	if(SSticker.mode)
 		SSticker.mode.picked_calls -= src
 
 	SEND_SIGNAL(src, COMSIG_ERT_SETUP)
+	candidates = remove_nonqualifiers(candidates)
 
 	if(length(candidates) < mob_min && !spawn_max_amount)
 		message_admins("Aborting distress beacon, not enough candidates: found [length(candidates)].")
@@ -237,6 +257,11 @@
 
 		if(!quiet_launch)
 			marine_announcement("The distress signal has not received a response, the launch tubes are now recalibrating.", "Distress Beacon", logging = ARES_LOG_SECURITY)
+		return
+
+	if(!ignore_ftl_or_crash && (SShijack.in_ftl || SShijack.crashed || SShijack.hijack_status == HIJACK_OBJECTIVES_GROUND_CRASH))
+		members = list()
+		candidates = list()
 		return
 
 	//We've got enough!
@@ -268,7 +293,7 @@
 	if(announce_incoming)
 		marine_announcement(dispatch_message, "Distress Beacon", 'sound/AI/distressreceived.ogg', logging = ARES_LOG_SECURITY) //Announcement that the Distress Beacon has been answered, does not hint towards the chosen ERT
 
-	message_admins("Distress beacon: [src.name] finalized, setting up candidates.")
+	message_admins("Distress beacon: [src.name] finalized, setting up candidates. [hostility? "[SPAN_WARNING("(THEY ARE HOSTILE)")]":"(they are friendly)"].")
 
 	//Let the deadchat know what's up since they are usually curious
 	for(var/mob/dead/observer/M in GLOB.observer_list)
@@ -293,10 +318,9 @@
 			return
 
 		var/list/active_lzs = list()
-		var/list/z_levels = SSmapping.levels_by_any_trait(list(ZTRAIT_MARINE_MAIN_SHIP))
 		for(var/obj/docking_port/stationary/dock as anything in lzs)
 			// filter for almayer only
-			if(!(dock.z in z_levels))
+			if(!is_mainship_level(dock.z))
 				continue
 			// filter for free lzs
 			if(shuttle.canDock(dock) != SHUTTLE_CAN_DOCK)
@@ -320,7 +344,7 @@
 
 
 	if(spawn_max_amount && i < mob_max)
-		for(var/c in i to mob_max)
+		for(var/c in i to mob_max - 1)
 			create_member(null, override_spawn_loc)
 
 	candidates = list()

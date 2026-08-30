@@ -1,3 +1,5 @@
+SET_PROTECTED_DATUM(/datum/controller/configuration)
+
 /datum/controller/configuration
 	name = "Configuration"
 
@@ -19,7 +21,7 @@
 	var/motd
 	var/policy
 
-	var/static/regex/ic_filter_regex
+	var/static/regex/word_filter_regex
 
 	var/is_loaded = FALSE
 
@@ -27,7 +29,6 @@
 	if(IsAdminAdvancedProcCall())
 		alert_proccall("configuration admin_reload")
 		return PROC_BLOCKED
-	log_admin("[key_name(usr)] has forcefully reloaded the configuration from disk.")
 	message_admins("[key_name_admin(usr)] has forcefully reloaded the configuration from disk.")
 	full_wipe()
 	Load(world.params[OVERRIDE_CONFIG_DIRECTORY_PARAMETER])
@@ -161,6 +162,9 @@
 			continue
 		_entries[esname] = E
 		_entries_by_type[I] = E
+
+		if(E.protection & (CONFIG_ENTRY_SENSITIVE|CONFIG_ENTRY_SENSITIVE_KEY))
+			GLOB.protected_config_entries += E
 
 
 /datum/controller/configuration/proc/RemoveEntry(datum/config_entry/CE)
@@ -315,21 +319,21 @@
 
 
 /datum/controller/configuration/proc/LoadChatFilter()
-	var/list/in_character_filter = list()
+	var/list/word_filter = list()
 
-	if(!fexists("[directory]/in_character_filter.txt"))
+	if(!fexists("[directory]/word_filter.txt"))
 		return
 
-	log_config("Loading config file in_character_filter.txt...")
+	log_config("Loading config file word_filter.txt...")
 
-	for(var/line in file2list("[directory]/in_character_filter.txt"))
+	for(var/line in file2list("[directory]/word_filter.txt"))
 		if(!line)
 			continue
 		if(findtextEx(line,"#",1,2))
 			continue
-		in_character_filter += REGEX_QUOTE(line)
+		word_filter += REGEX_QUOTE(line)
 
-	ic_filter_regex = length(in_character_filter) ? regex("\\b([jointext(in_character_filter, "|")])\\b", "i") : null
+	word_filter_regex = length(word_filter) ? regex("\\b([jointext(word_filter, "|")])\\b", "i") : null
 
 //Message admins when you can.
 /datum/controller/configuration/proc/DelayedMessageAdmins(text)

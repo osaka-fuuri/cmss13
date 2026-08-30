@@ -50,7 +50,7 @@
 //Corporation Vessel Contracting - Ship and station construction, materials research.
 //Corporation Osiris Atmospherics - Atmospherics machinery construction and chemical research.
 //Corporation Second Red Cross Society - 26th century Red Cross reborn as a dominating economic force in biomedical science (research and materials).
-//Corporation Blue Industries - High tech and high energy research, in particular into the mysteries of bluespace manipulation and power generation.
+//Corporation Blue Industries - High-tech and high energy research, in particular into the mysteries of bluespace manipulation and power generation.
 //Corporation Kusanagi Robotics - Founded by robotics legend Kaito Kusanagi in the 2070s, they have been on the forefront of mechanical augmentation and robotics development ever since.
 //Corporation Free traders - Not so much a corporation as a loose coalition of spacers, Free Traders are a roving band of smugglers, traders and fringe elements following a rigid (if informal) code of loyalty and honour. Mistrusted by most corporations, they are tolerated because of their uncanny ability to smell out a profit.
 
@@ -74,11 +74,6 @@ GLOBAL_VAR_INIT(economy_init, FALSE)
 /proc/setup_economy()
 	if(GLOB.economy_init)
 		return 2
-
-	for(var/loc_type in typesof(/datum/trade_destination) - /datum/trade_destination)
-		var/datum/trade_destination/D = new loc_type
-		GLOB.weighted_randomevent_locations[D] = length(D.viable_random_events)
-		GLOB.weighted_mundaneevent_locations[D] = length(D.viable_mundane_events)
 
 	create_station_account()
 

@@ -32,7 +32,7 @@
 #define STOP_PROCESSING(Processor, Datum) Datum.datum_flags &= ~DF_ISPROCESSING;Processor.processing -= Datum;Processor.currentrun -= Datum
 
 /// Returns true if the MC is initialized and running.
-/// Optional argument init_stage controls what stage the mc must have initializted to count as initialized. Defaults to INITSTAGE_MAX if not specified.
+/// Optional argument init_stage controls what stage the mc must have initialized to count as initialized. Defaults to INITSTAGE_MAX if not specified.
 #define MC_RUNNING(INIT_STAGE...) (Master && Master.processing > 0 && Master.current_runlevel && Master.init_stage_completed == (max(min(INITSTAGE_MAX, ##INIT_STAGE), 1)))
 
 #define MC_LOOP_RTN_NEWSTAGES 1
@@ -118,7 +118,7 @@
 	NEW_SS_GLOBAL(SS##X);\
 	PreInit();\
 }\
-/datum/controller/subsystem/processing/##X/fire() {..() /*just so it shows up on the profiler*/} \
+/datum/controller/subsystem/processing/##X/fire() {CAN_BE_REDEFINED(TRUE); ..() /*just so it shows up on the profiler*/} \
 /datum/controller/subsystem/processing/##X
 
 #define log_qdel(X) log_debug(X)

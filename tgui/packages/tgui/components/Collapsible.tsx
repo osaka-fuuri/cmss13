@@ -1,13 +1,12 @@
-/* eslint-disable func-style */
 /**
  * @file
  * @copyright 2020 Aleksej Komarov
  * @license MIT
  */
 
-import { ReactNode, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 
-import { Box, BoxProps } from './Box';
+import { Box, type BoxProps } from './Box';
 import { Button } from './Button';
 
 type Props = Partial<{
@@ -24,7 +23,7 @@ export function Collapsible(props: Props) {
 
   return (
     <Box mb={1}>
-      <div className="Table">
+      <div className="Table__Collapsible">
         <div className="Table__cell">
           <Button
             fluid
