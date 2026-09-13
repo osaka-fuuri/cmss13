@@ -100,7 +100,7 @@
 
 /datum/sprite_accessory/hair/bedhead
 	name = "Bedhead"
-	icon_state = "hair_bedhead"+
+	icon_state = "hair_bedhead"
 
 /datum/sprite_accessory/hair/bedhead2
 	name = "Bedhead 2"
